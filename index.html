@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Dubai Lottery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'brand-bg': '#0d1117', // Darker, more neutral background
+                        'brand-surface': '#161b22', // Card backgrounds
+                        'brand-secondary': '#30363d', // Borders, secondary elements
+                        'brand-primary': '#f0b90b', // A slightly richer gold
+                        'brand-accent': '#38bdf8', // A vibrant blue for secondary actions/highlights
+                        'brand-text': '#e6edf3',
+                        'brand-text-secondary': '#8b949e',
+                        'success': '#28a745',
+                        'danger': '#dc3545',
+                    },
+                    keyframes: {
+                        'fade-in-down': {
+                            '0%': {
+                                opacity: '0',
+                                transform: 'translateY(-10px)'
+                            },
+                            '100%': {
+                                opacity: '1',
+                                transform: 'translateY(0)'
+                            },
+                        },
+                        'glow': {
+                            '0%, 100%': { boxShadow: '0 0 5px #f0b90b' },
+                            '50%': { boxShadow: '0 0 20px #f0b90b' },
+                        }
+                    },
+                    animation: {
+                        'fade-in-down': 'fade-in-down 0.5s ease-out',
+                        'glow': 'glow 1.5s ease-in-out infinite',
+                    },
+                    boxShadow: {
+                        'glow': '0 0 15px rgba(240, 185, 11, 0.6)',
+                    }
+                }
+            }
+        }
+    </script>
+    <script type="module" src="/index.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.14.0",
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.8.1"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-brand-bg text-brand-text font-sans">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
