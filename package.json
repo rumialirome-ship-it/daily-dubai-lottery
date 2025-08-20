@@ -4,7 +4,7 @@
   "description": "A full-featured lottery game application with admin and user roles, powered by Gemini Smart.",
   "private": true,
   "scripts": {
-    "build": "npm run clean && esbuild index.tsx --bundle --outfile=dist/index.js --loader:.tsx=tsx --define:process.env.NODE_ENV='\"production\"' && cp index.html dist/index.html && cp -r assets/ dist/assets/ 2>/dev/null || :",
+    "build": "npm run clean && esbuild index.tsx --bundle --outfile=dist/index.js --loader:.tsx=tsx --jsx=automatic --define:process.env.NODE_ENV='\"production\"' && cp index.html dist/index.html && cp -r assets/ dist/assets/ 2>/dev/null || :",
     "clean": "rm -rf dist"
   },
   "dependencies": {
