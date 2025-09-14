@@ -1,129 +1,168 @@
-const sqlite3 = require('sqlite3').verbose();
+require('dotenv').config();
+const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
-const path = require('path');
 
-const dbPath = path.resolve(__dirname, 'lottery.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error opening database', err.message);
-    } else {
-        console.log('Connected to the SQLite database.');
-        initializeDb();
-    }
+const { DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE } = process.env;
+
+// This pool will be used by the application to query the database.
+const pool = mysql.createPool({
+    host: DB_HOST,
+    user: DB_USER,
+    password: DB_PASSWORD,
+    database: DB_DATABASE,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 });
 
-const initializeDb = () => {
-    db.serialize(() => {
-        // Create Clients Table
-        db.run(`CREATE TABLE IF NOT EXISTS clients (
-            id TEXT PRIMARY KEY,
-            clientId TEXT UNIQUE NOT NULL,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL CHECK(role IN ('ADMIN', 'CLIENT')),
-            wallet REAL NOT NULL DEFAULT 0,
-            area TEXT,
-            contact TEXT,
-            isActive BOOLEAN NOT NULL DEFAULT 1,
-            commissionRates TEXT,
-            prizeRates TEXT
-        )`);
+const initializeDb = async () => {
+    let connection;
+    try {
+        // Connect without a specific database to create it if it doesn't exist.
+        connection = await mysql.createConnection({
+            host: DB_HOST,
+            user: DB_USER,
+            password: DB_PASSWORD,
+        });
+        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\`;`);
+        console.log(`Database '${DB_DATABASE}' is ready.`);
+        await connection.end();
 
-        // Create Draws Table
-        db.run(`CREATE TABLE IF NOT EXISTS draws (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            level TEXT NOT NULL,
-            drawTime TEXT NOT NULL,
-            status TEXT NOT NULL,
-            winningNumbers TEXT
-        )`);
+        // Now, use the pool which is connected to the specific database for table creation.
+        connection = await pool.getConnection();
+        console.log('Connected to the MySQL database.');
 
-        // Create Bets Table
-        db.run(`CREATE TABLE IF NOT EXISTS bets (
-            id TEXT PRIMARY KEY,
-            clientId TEXT NOT NULL,
-            drawId TEXT NOT NULL,
-            gameType TEXT NOT NULL,
-            number TEXT NOT NULL,
-            stake REAL NOT NULL,
-            createdAt TEXT NOT NULL,
-            condition TEXT NOT NULL,
-            positions TEXT,
-            FOREIGN KEY (clientId) REFERENCES clients (id),
-            FOREIGN KEY (drawId) REFERENCES draws (id)
-        )`);
+        // Create Tables with MySQL-compatible syntax
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS clients (
+                id VARCHAR(255) PRIMARY KEY,
+                clientId VARCHAR(255) UNIQUE NOT NULL,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                role VARCHAR(10) NOT NULL CHECK(role IN ('ADMIN', 'CLIENT')),
+                wallet DECIMAL(15, 2) NOT NULL DEFAULT 0,
+                area VARCHAR(255),
+                contact VARCHAR(255),
+                isActive BOOLEAN NOT NULL DEFAULT 1,
+                commissionRates TEXT,
+                prizeRates TEXT
+            )
+        `);
 
-        // Create Transactions Table
-        db.run(`CREATE TABLE IF NOT EXISTS transactions (
-            id TEXT PRIMARY KEY,
-            clientId TEXT NOT NULL,
-            type TEXT NOT NULL CHECK(type IN ('DEBIT', 'CREDIT')),
-            amount REAL NOT NULL,
-            description TEXT NOT NULL,
-            balanceAfter REAL NOT NULL,
-            createdAt TEXT NOT NULL,
-            relatedId TEXT,
-            FOREIGN KEY (clientId) REFERENCES clients (id)
-        )`);
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS draws (
+                id VARCHAR(255) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                level VARCHAR(5) NOT NULL,
+                drawTime DATETIME NOT NULL,
+                status VARCHAR(20) NOT NULL,
+                winningNumbers TEXT
+            )
+        `);
+
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS bets (
+                id VARCHAR(255) PRIMARY KEY,
+                clientId VARCHAR(255) NOT NULL,
+                drawId VARCHAR(255) NOT NULL,
+                gameType VARCHAR(20) NOT NULL,
+                number VARCHAR(255) NOT NULL,
+                stake DECIMAL(15, 2) NOT NULL,
+                createdAt DATETIME NOT NULL,
+                condition VARCHAR(20) NOT NULL,
+                positions TEXT,
+                FOREIGN KEY (clientId) REFERENCES clients (id) ON DELETE CASCADE,
+                FOREIGN KEY (drawId) REFERENCES draws (id) ON DELETE CASCADE
+            )
+        `);
+
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS transactions (
+                id VARCHAR(255) PRIMARY KEY,
+                clientId VARCHAR(255) NOT NULL,
+                type VARCHAR(10) NOT NULL CHECK(type IN ('DEBIT', 'CREDIT')),
+                amount DECIMAL(15, 2) NOT NULL,
+                description TEXT NOT NULL,
+                balanceAfter DECIMAL(15, 2) NOT NULL,
+                createdAt DATETIME NOT NULL,
+                relatedId VARCHAR(255),
+                FOREIGN KEY (clientId) REFERENCES clients (id) ON DELETE CASCADE
+            )
+        `);
+
+        console.log('Tables are created or already exist.');
         
-        seedData();
-    });
+        await seedData(connection);
+
+    } catch (err) {
+        console.error('Error during database initialization:', err);
+        throw err; // Throw error to stop the script
+    } finally {
+        if (connection) connection.release();
+    }
 };
 
-const seedData = () => {
+const seedData = async (connection) => {
     // Seed Admin User
     const adminPassword = 'admin@123';
-    bcrypt.genSalt(10, (err, salt) => {
-        bcrypt.hash(adminPassword, salt, (err, hash) => {
-            if (err) throw err;
-            const adminId = 'client-admin-ali';
-            db.get(`SELECT id FROM clients WHERE id = ?`, [adminId], (err, row) => {
-                if (!row) {
-                    const stmt = db.prepare(`INSERT INTO clients (id, clientId, username, password, role, isActive, prizeRates, commissionRates) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-                    stmt.run(
-                        adminId, 'admin', 'admin', hash, 'ADMIN', 1, 
-                        JSON.stringify({ "4D": { "first": 525000, "second": 165000 }, "3D": { "first": 80000, "second": 26000 }, "2D": { "first": 8000, "second": 2600 }, "1D": { "first": 800, "second": 260 } }),
-                        JSON.stringify({})
-                    );
-                    stmt.finalize();
-                    console.log('Admin user created.');
-                }
-            });
-        });
-    });
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(adminPassword, salt);
+    const adminId = 'client-admin-ali';
+
+    await connection.query(
+        `INSERT IGNORE INTO clients (id, clientId, username, password, role, isActive, prizeRates, commissionRates) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            adminId, 'admin', 'admin', hash, 'ADMIN', 1, 
+            JSON.stringify({ "4D": { "first": 525000, "second": 165000 }, "3D": { "first": 80000, "second": 26000 }, "2D": { "first": 8000, "second": 2600 }, "1D": { "first": 800, "second": 260 } }),
+            JSON.stringify({})
+        ]
+    );
+    console.log('Admin user seeded or already exists.');
 
     // Seed Draws
-    db.get(`SELECT COUNT(*) as count FROM draws`, [], (err, row) => {
-        if (row.count === 0) {
-            console.log('Seeding draws...');
-            const today = new Date();
-            const createDrawTime = (hour) => new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 0, 0, 0).toISOString();
-            
-            const draws = [
-                { id: 'draw-today-1', name: '11:00 AM', level: 'F', drawTime: createDrawTime(11) },
-                { id: 'draw-today-2', name: '12:00 PM', level: 'S', drawTime: createDrawTime(12) },
-                { id: 'draw-today-3', name: '01:00 PM', level: 'S', drawTime: createDrawTime(13) },
-                { id: 'draw-today-4', name: '02:00 PM', level: 'S', drawTime: createDrawTime(14) },
-                { id: 'draw-today-5', name: '03:00 PM', level: 'S', drawTime: createDrawTime(15) },
-                { id: 'draw-today-6', name: '04:00 PM', level: 'S', drawTime: createDrawTime(16) },
-                { id: 'draw-today-7', name: '05:00 PM', level: 'S', drawTime: createDrawTime(17) },
-                { id: 'draw-today-8', name: '06:00 PM', level: 'S', drawTime: createDrawTime(18) },
-                { id: 'draw-today-9', name: '07:00 PM', level: 'S', drawTime: createDrawTime(19) },
-                { id: 'draw-today-10', name: '08:00 PM', level: 'S', drawTime: createDrawTime(20) },
-                { id: 'draw-today-11', name: '09:00 PM', level: 'S', drawTime: createDrawTime(21) },
-                { id: 'draw-today-12', name: '10:00 PM', level: 'S', drawTime: createDrawTime(22) },
-                { id: 'draw-today-13', name: '11:00 PM', level: 'S', drawTime: createDrawTime(23) },
-            ];
+    const [rows] = await connection.query(`SELECT COUNT(*) as count FROM draws`);
+    if (rows[0].count === 0) {
+        console.log('Seeding draws...');
+        const today = new Date();
+        const createDrawTime = (hour) => new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 0, 0, 0);
+        
+        const draws = [
+            { id: 'draw-today-1', name: '11:00 AM', level: 'F', drawTime: createDrawTime(11) },
+            { id: 'draw-today-2', name: '12:00 PM', level: 'S', drawTime: createDrawTime(12) },
+            { id: 'draw-today-3', name: '01:00 PM', level: 'S', drawTime: createDrawTime(13) },
+            { id: 'draw-today-4', name: '02:00 PM', level: 'S', drawTime: createDrawTime(14) },
+            { id: 'draw-today-5', name: '03:00 PM', level: 'S', drawTime: createDrawTime(15) },
+            { id: 'draw-today-6', name: '04:00 PM', level: 'S', drawTime: createDrawTime(16) },
+            { id: 'draw-today-7', name: '05:00 PM', level: 'S', drawTime: createDrawTime(17) },
+            { id: 'draw-today-8', name: '06:00 PM', level: 'S', drawTime: createDrawTime(18) },
+            { id: 'draw-today-9', name: '07:00 PM', level: 'S', drawTime: createDrawTime(19) },
+            { id: 'draw-today-10', name: '08:00 PM', level: 'S', drawTime: createDrawTime(20) },
+            { id: 'draw-today-11', name: '09:00 PM', level: 'S', drawTime: createDrawTime(21) },
+            { id: 'draw-today-12', name: '10:00 PM', level: 'S', drawTime: createDrawTime(22) },
+            { id: 'draw-today-13', name: '11:00 PM', level: 'S', drawTime: createDrawTime(23) },
+        ];
 
-            const stmt = db.prepare(`INSERT INTO draws (id, name, level, drawTime, status, winningNumbers) VALUES (?, ?, ?, ?, ?, ?)`);
-            draws.forEach(draw => {
-                stmt.run(draw.id, draw.name, draw.level, draw.drawTime, 'UPCOMING', JSON.stringify([]));
-            });
-            stmt.finalize();
-            console.log(`${draws.length} draws seeded.`);
-        }
-    });
+        const insertPromises = draws.map(draw => {
+            return connection.query(`INSERT INTO draws (id, name, level, drawTime, status, winningNumbers) VALUES (?, ?, ?, ?, ?, ?)`,
+                [draw.id, draw.name, draw.level, draw.drawTime, 'UPCOMING', JSON.stringify([])]
+            );
+        });
+        await Promise.all(insertPromises);
+        console.log(`${draws.length} draws seeded.`);
+    }
 };
 
-module.exports = db;
+// If this file is run directly via "npm run db:init", initialize the DB
+if (require.main === module) {
+    console.log('Running DB initialization script for MySQL...');
+    initializeDb().then(() => {
+        console.log('Initialization complete.');
+        pool.end(); // End the pool connections after the script is done
+    }).catch(err => {
+        console.error("Initialization failed:", err);
+        process.exit(1);
+    });
+}
+
+// Export the pool for use in the application
+module.exports = pool;
