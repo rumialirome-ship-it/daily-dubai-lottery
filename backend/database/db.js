@@ -1,8 +1,40 @@
+
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
+// ===================================================================================
+// VERY IMPORTANT LOGGING - v4
+// ===================================================================================
+console.log("\n\n");
+console.log("██████╗ ██╗   ██╗██╗     ██╗   ██╗███████╗██████╗");
+console.log("██╔══██╗██║   ██║██║     ██║   ██║██╔════╝██╔══██╗");
+console.log("██║  ██║██║   ██║██║     ██║   ██║█████╗  ██████╔╝");
+console.log("██║  ██║██║   ██║██║     ██║   ██║██╔══╝  ██╔══██╗");
+console.log("██████╔╝╚██████╔╝███████╗╚██████╔╝███████╗██║  ██║");
+console.log("╚═════╝  ╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝");
+console.log("      V E R S I O N   4   D I A G N O S T I C      ");
+console.log("\n[CONFIRMATION] If you see this banner, the correct 'db.js' file is being executed.");
+console.log("===================================================================");
+console.log(`[INFO] Script started at: ${new Date().toISOString()}`);
+console.log("[INFO] This script should ONLY connect to MySQL, not SQLite.");
+// ===================================================================================
+
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE } = process.env;
+
+// Log the environment variables being used
+console.log("\n[STEP 1/7] Reading database configuration from .env file...");
+console.log(`  - DB_HOST: ${DB_HOST}`);
+console.log(`  - DB_USER: ${DB_USER}`);
+console.log(`  - DB_PASSWORD: ${DB_PASSWORD ? '******' : 'NOT SET'}`); // Don't log the actual password
+console.log(`  - DB_DATABASE: ${DB_DATABASE}`);
+if (!DB_HOST || !DB_USER || !DB_DATABASE) {
+    console.error("\n[FATAL ERROR] One or more required database environment variables (DB_HOST, DB_USER, DB_DATABASE) are missing.");
+    console.error("[FATAL ERROR] Please check your .env file in the 'backend' directory.");
+    process.exit(1);
+}
+console.log("[SUCCESS] Configuration loaded.");
+
 
 // This pool will be used by the application to query the database.
 const pool = mysql.createPool({
@@ -16,27 +48,31 @@ const pool = mysql.createPool({
 });
 
 const initializeDb = async () => {
-    console.log("--- [1/7] Starting Database Initialization for MySQL ---");
+    console.log("\n[STEP 2/7] Starting Database Initialization for MySQL...");
     let connection;
     try {
         // Connect without a specific database to create it if it doesn't exist.
-        console.log(`--- [2/7] Checking for database '${DB_DATABASE}'... ---`);
+        console.log(`[INFO] Attempting to connect to MySQL server at ${DB_HOST} to check for database '${DB_DATABASE}'...`);
         connection = await mysql.createConnection({
             host: DB_HOST,
             user: DB_USER,
             password: DB_PASSWORD,
         });
+        console.log("[SUCCESS] Connected to MySQL server.");
+
+        console.log(`\n[STEP 3/7] Creating database '${DB_DATABASE}' if it doesn't exist...`);
         await connection.query(`CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\`;`);
-        console.log(`--- [3/7] Database '${DB_DATABASE}' is ready. ---`);
+        console.log(`[SUCCESS] Database '${DB_DATABASE}' is ready.`);
         await connection.end();
+        console.log("[INFO] Initial connection to server closed.");
 
         // Now, use the pool which is connected to the specific database for table creation.
-        console.log("--- [4/7] Attempting to get connection from pool... ---");
+        console.log(`\n[STEP 4/7] Getting a new connection from the pool for database '${DB_DATABASE}'...`);
         connection = await pool.getConnection();
-        console.log('--- [5/7] Successfully connected to the MySQL database. ---');
+        console.log(`[SUCCESS] Connected to the '${DB_DATABASE}' database via connection pool.`);
 
         // Create Tables with MySQL-compatible syntax
-        console.log("--- [6/7] Creating tables if they do not exist... ---");
+        console.log("\n[STEP 5/7] Creating tables if they do not exist...");
         await connection.query(`
             CREATE TABLE IF NOT EXISTS clients (
                 id VARCHAR(255) PRIMARY KEY,
@@ -52,6 +88,7 @@ const initializeDb = async () => {
                 prizeRates TEXT
             )
         `);
+        console.log("  - Table 'clients' created or already exists.");
 
         await connection.query(`
             CREATE TABLE IF NOT EXISTS draws (
@@ -63,6 +100,7 @@ const initializeDb = async () => {
                 winningNumbers TEXT
             )
         `);
+        console.log("  - Table 'draws' created or already exists.");
 
         await connection.query(`
             CREATE TABLE IF NOT EXISTS bets (
@@ -79,6 +117,8 @@ const initializeDb = async () => {
                 FOREIGN KEY (drawId) REFERENCES draws (id) ON DELETE CASCADE
             )
         `);
+        console.log("  - Table 'bets' created or already exists.");
+
 
         await connection.query(`
             CREATE TABLE IF NOT EXISTS transactions (
@@ -93,21 +133,34 @@ const initializeDb = async () => {
                 FOREIGN KEY (clientId) REFERENCES clients (id) ON DELETE CASCADE
             )
         `);
+        console.log("  - Table 'transactions' created or already exists.");
 
-        console.log('--- [6/7] Tables are created or already exist. ---');
+        console.log("[SUCCESS] All tables are created or already exist.");
         
-        console.log("--- [7/7] Seeding initial data... ---");
+        console.log("\n[STEP 6/7] Seeding initial data (Admin user and Draws)...");
         await seedData(connection);
-        console.log("--- [7/7] Seeding complete. ---");
+        console.log("[SUCCESS] Seeding complete.");
+        
+        console.log("\n===================================================================");
+        console.log("      DATABASE INITIALIZATION COMPLETE!                             ");
+        console.log("===================================================================");
+
 
     } catch (err) {
-        console.error('--- DATABASE INITIALIZATION FAILED ---');
+        console.error('\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+        console.error('      DATABASE INITIALIZATION FAILED                               ');
+        console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         console.error('Error during database initialization:', err);
+        console.error("\n[TROUBLESHOOTING]");
+        console.error("1. Verify the DB_HOST, DB_USER, DB_PASSWORD in your 'backend/.env' file are correct.");
+        console.error("2. Ensure the MySQL server is running on your VPS.");
+        console.error("3. Check that the user 'ddl_user' has permissions to create databases and tables.");
+        console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         throw err; // Throw error to stop the script
     } finally {
         if (connection) {
             connection.release();
-            console.log("--- Database connection released. ---");
+            console.log("\n[STEP 7/7] Database connection released.");
         }
     }
 };
@@ -127,12 +180,12 @@ const seedData = async (connection) => {
             JSON.stringify({})
         ]
     );
-    console.log(' > Admin user seeded or already exists.');
+    console.log('  - Admin user seeded or already exists.');
 
     // Seed Draws
     const [rows] = await connection.query(`SELECT COUNT(*) as count FROM draws`);
     if (rows[0].count === 0) {
-        console.log(' > Seeding draws...');
+        console.log('  - No draws found. Seeding draws for today...');
         const today = new Date();
         const createDrawTime = (hour) => new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 0, 0, 0);
         
@@ -158,19 +211,21 @@ const seedData = async (connection) => {
             );
         });
         await Promise.all(insertPromises);
-        console.log(` > ${draws.length} draws seeded.`);
+        console.log(`  - ${draws.length} draws seeded.`);
+    } else {
+        console.log('  - Draws already exist, skipping seeding.');
     }
 };
 
 // If this file is run directly via "npm run db:init", initialize the DB
 if (require.main === module) {
-    console.log('Running DB initialization script for MySQL from command line...');
+    console.log('\n[INFO] Running DB initialization script directly from command line...');
     initializeDb().then(() => {
-        console.log('--- Initialization complete. Closing pool. ---');
+        console.log('--- Script finished successfully. Closing pool. ---');
         pool.end(); // End the pool connections after the script is done
     }).catch(err => {
-        console.error("--- Initialization script failed ---");
-        console.error(err.message);
+        console.error("\n--- Initialization script failed with a fatal error. ---");
+        // The error is already logged inside initializeDb
         process.exit(1);
     });
 }
