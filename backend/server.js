@@ -4,7 +4,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const express = require('express');
 const cors = require('cors');
-const db = require('./database/db');
+const db = require(path.join(__dirname, 'database', 'db'));
 
 // Route imports - Using path.join for robust path resolution
 const authRoutes = require(path.join(__dirname, 'routes', 'authRoutes'));
