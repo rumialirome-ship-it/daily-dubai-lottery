@@ -1,4 +1,5 @@
-const db = require('../database/db');
+const path = require('path');
+const db = require(path.join(__dirname, '..', 'database', 'db'));
 const bcrypt = require('bcryptjs');
 
 const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
