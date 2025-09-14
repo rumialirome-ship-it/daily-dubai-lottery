@@ -6,12 +6,12 @@ const express = require('express');
 const cors = require('cors');
 const db = require('./database/db');
 
-// Route imports
-const authRoutes = require('./routes/authRoutes');
-const drawRoutes = require('./routes/drawRoutes');
-const clientRoutes = require('./routes/clientRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const healthRoutes = require('./routes/healthRoutes');
+// Route imports - Using path.join for robust path resolution
+const authRoutes = require(path.join(__dirname, 'routes', 'authRoutes'));
+const drawRoutes = require(path.join(__dirname, 'routes', 'drawRoutes'));
+const clientRoutes = require(path.join(__dirname, 'routes', 'clientRoutes'));
+const adminRoutes = require(path.join(__dirname, 'routes', 'adminRoutes'));
+const healthRoutes = require(path.join(__dirname, 'routes', 'healthRoutes'));
 
 const app = express();
 
