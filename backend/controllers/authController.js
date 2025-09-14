@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const db = require('../database/db');
+const path = require('path');
+const db = require(path.join(__dirname, '..', 'database', 'db'));
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
