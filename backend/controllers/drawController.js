@@ -1,11 +1,9 @@
 const db = require('../database/db');
 const { getDynamicDrawStatus } = require('../utils/drawHelpers');
 
-const getDraws = (req, res) => {
-    db.all("SELECT * FROM draws", [], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ message: "Failed to retrieve draws." });
-        }
+const getDraws = async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM draws");
         
         const marketOverride = 'AUTO'; // This could be fetched from a config table in the future
         const currentTime = new Date();
@@ -23,7 +21,10 @@ const getDraws = (req, res) => {
         });
         
         res.json(drawsWithStatus);
-    });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to retrieve draws." });
+    }
 };
 
 module.exports = { getDraws };
