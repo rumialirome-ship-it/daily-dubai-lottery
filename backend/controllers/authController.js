@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const db = require('../database/db');
-const { getClientById } = require('./clientController');
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -9,39 +8,37 @@ const generateToken = (id) => {
     });
 };
 
-const loginUser = (req, res) => {
+const loginUser = async (req, res) => {
     const { loginIdentifier, password, role } = req.body;
 
     const sql = `SELECT * FROM clients WHERE (username = ? OR clientId = ?) AND role = ?`;
-    db.get(sql, [loginIdentifier, loginIdentifier, role], (err, client) => {
-        if (err) {
-            return res.status(500).json({ message: 'Database error during login.' });
-        }
+    try {
+        const [rows] = await db.query(sql, [loginIdentifier, loginIdentifier, role]);
+        const client = rows[0];
 
         if (client) {
-            bcrypt.compare(password, client.password, (err, isMatch) => {
-                if (err) {
-                    return res.status(500).json({ message: 'Error comparing passwords.' });
+            const isMatch = await bcrypt.compare(password, client.password);
+            if (isMatch) {
+                 if (!client.isActive) {
+                    return res.status(403).json({ message: 'Your account has been suspended.' });
                 }
-                if (isMatch) {
-                     if (!client.isActive) {
-                        return res.status(403).json({ message: 'Your account has been suspended.' });
-                    }
-                    res.json({
-                        id: client.id,
-                        clientId: client.clientId,
-                        username: client.username,
-                        role: client.role,
-                        token: generateToken(client.id),
-                    });
-                } else {
-                    res.status(401).json({ message: 'Invalid credentials' });
-                }
-            });
+                res.json({
+                    id: client.id,
+                    clientId: client.clientId,
+                    username: client.username,
+                    role: client.role,
+                    token: generateToken(client.id),
+                });
+            } else {
+                res.status(401).json({ message: 'Invalid credentials' });
+            }
         } else {
             res.status(401).json({ message: 'Invalid credentials' });
         }
-    });
+    } catch (error) {
+        console.error("Login error:", error);
+        res.status(500).json({ message: 'Database error during login.' });
+    }
 };
 
 module.exports = { loginUser };
