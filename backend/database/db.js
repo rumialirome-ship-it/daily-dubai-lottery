@@ -51,13 +51,14 @@ const initializeDb = async () => {
     console.log("\n[STEP 2/7] Starting Database Initialization for MySQL...");
     let connection;
     try {
-        // Connect without a specific database to create it if it doesn't exist.
-        console.log(`[INFO] Attempting to connect to MySQL server at ${DB_HOST} to check for database '${DB_DATABASE}'...`);
-        connection = await mysql.createConnection({
+        const connectionConfig = {
             host: DB_HOST,
             user: DB_USER,
             password: DB_PASSWORD,
-        });
+        };
+        // Connect without a specific database to create it if it doesn't exist.
+        console.log(`[INFO] Attempting to connect to MySQL server at '${connectionConfig.host}' to check for database '${DB_DATABASE}'...`);
+        connection = await mysql.createConnection(connectionConfig);
         console.log("[SUCCESS] Connected to MySQL server.");
 
         console.log(`\n[STEP 3/7] Creating database '${DB_DATABASE}' if it doesn't exist...`);
@@ -153,8 +154,9 @@ const initializeDb = async () => {
         console.error('Error during database initialization:', err);
         console.error("\n[TROUBLESHOOTING]");
         console.error("1. Verify the DB_HOST, DB_USER, DB_PASSWORD in your 'backend/.env' file are correct.");
-        console.error("2. Ensure the MySQL server is running on your VPS.");
+        console.error("2. Ensure the MySQL server is running on your VPS. You can check with 'sudo systemctl status mysql'.");
         console.error("3. Check that the user 'ddl_user' has permissions to create databases and tables.");
+        console.error("4. If the error is ECONNREFUSED, ensure DB_HOST is '127.0.0.1' and not 'localhost'.");
         console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         throw err; // Throw error to stop the script
     } finally {
