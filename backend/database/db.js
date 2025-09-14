@@ -38,7 +38,7 @@ if (dotenvResult.error) {
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE } = process.env;
 
 // Log the environment variables being used
-console.log("\n[STEP 1/7] Reading database configuration from .env file...");
+console.log("\n[STEP 1/6] Reading database configuration from .env file...");
 console.log(`  - DB_HOST: ${DB_HOST}`);
 console.log(`  - DB_USER: ${DB_USER}`);
 console.log(`  - DB_PASSWORD: ${DB_PASSWORD ? '******' : 'NOT SET'}`); // Don't log the actual password
@@ -63,32 +63,18 @@ const pool = mysql.createPool({
 });
 
 const initializeDb = async () => {
-    console.log("\n[STEP 2/7] Starting Database Initialization for MySQL...");
+    console.log("\n[STEP 2/6] Starting Database Initialization for MySQL...");
     let connection;
     try {
-        const connectionConfig = {
-            host: DB_HOST,
-            user: DB_USER,
-            password: DB_PASSWORD,
-        };
-        // Connect without a specific database to create it if it doesn't exist.
-        console.log(`[INFO] Attempting to connect to MySQL server at '${connectionConfig.host}' as user '${connectionConfig.user}' to check for database '${DB_DATABASE}'...`);
-        connection = await mysql.createConnection(connectionConfig);
-        console.log("[SUCCESS] Connected to MySQL server.");
-
-        console.log(`\n[STEP 3/7] Creating database '${DB_DATABASE}' if it doesn't exist...`);
-        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\`;`);
-        console.log(`[SUCCESS] Database '${DB_DATABASE}' is ready.`);
-        await connection.end();
-        console.log("[INFO] Initial connection to server closed.");
-
-        // Now, use the pool which is connected to the specific database for table creation.
-        console.log(`\n[STEP 4/7] Getting a new connection from the pool for database '${DB_DATABASE}'...`);
+        // The script now assumes the database already exists, as per standard deployment practice.
+        // It will connect directly using the pool configured with the database name.
+        // If this step fails, it means the database does not exist or credentials are wrong.
+        console.log(`\n[STEP 3/6] Connecting to the '${DB_DATABASE}' database...`);
         connection = await pool.getConnection();
-        console.log(`[SUCCESS] Connected to the '${DB_DATABASE}' database via connection pool.`);
+        console.log(`[SUCCESS] Connected to the '${DB_DATABASE}' database.`);
 
         // Create Tables with MySQL-compatible syntax
-        console.log("\n[STEP 5/7] Creating tables if they do not exist...");
+        console.log("\n[STEP 4/6] Creating tables if they do not exist...");
         await connection.query(`
             CREATE TABLE IF NOT EXISTS clients (
                 id VARCHAR(255) PRIMARY KEY,
@@ -153,7 +139,7 @@ const initializeDb = async () => {
 
         console.log("[SUCCESS] All tables are created or already exist.");
         
-        console.log("\n[STEP 6/7] Seeding initial data (Admin user and Draws)...");
+        console.log("\n[STEP 5/6] Seeding initial data (Admin user and Draws)...");
         await seedData(connection);
         console.log("[SUCCESS] Seeding complete.");
         
@@ -168,16 +154,18 @@ const initializeDb = async () => {
         console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         console.error('Error during database initialization:', err);
         console.error("\n[TROUBLESHOOTING]");
-        console.error("1. Verify the DB_HOST, DB_USER, DB_PASSWORD in your 'backend/.env' file are correct.");
-        console.error("2. Ensure the MySQL server is running on your VPS. You can check with 'sudo systemctl status mysql'.");
-        console.error("3. Check that the user 'ddl_user' has permissions to create databases and tables.");
-        console.error("4. If the error is ECONNREFUSED, ensure DB_HOST is '127.0.0.1' and not 'localhost'.");
+        console.error("1. Ensure the database 'mydb' (or the one you set in .env) has been created in MySQL.");
+        console.error("   You can create it by logging into MySQL as root and running: CREATE DATABASE IF NOT EXISTS mydb;");
+        console.error("2. Verify the DB_HOST, DB_USER, DB_PASSWORD, and DB_DATABASE in your 'backend/.env' file are correct.");
+        console.error("3. Ensure the MySQL server is running. You can check with 'sudo systemctl status mysql'.");
+        console.error("4. Check that the user 'ddl_user' has ALL PRIVILEGES on the database. See README.md for the GRANT command.");
+        console.error("5. If the error is ECONNREFUSED, ensure DB_HOST is '127.0.0.1' and not 'localhost'.");
         console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         throw err; // Throw error to stop the script
     } finally {
         if (connection) {
             connection.release();
-            console.log("\n[STEP 7/7] Database connection released.");
+            console.log("\n[STEP 6/6] Database connection released.");
         }
     }
 };
