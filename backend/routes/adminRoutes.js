@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { protect, admin } = require('../middleware/authMiddleware');
+const path = require('path');
+const { protect, admin } = require(path.join(__dirname, '..', 'middleware', 'authMiddleware'));
 const { 
     getAllClients, 
     registerClient, 
@@ -14,7 +15,7 @@ const {
     placeBetsForClient,
     getAllBets,
     getAllTransactions
-} = require('../controllers/adminController');
+} = require(path.join(__dirname, '..', 'controllers', 'adminController'));
 
 // All routes in this file are protected and require admin privileges
 router.use(protect, admin);
