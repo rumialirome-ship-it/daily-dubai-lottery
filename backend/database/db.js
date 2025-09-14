@@ -1,10 +1,10 @@
 
+
 const path = require('path');
 // Explicitly load .env from the 'backend' directory using an absolute path.
 // This is more robust and ensures that the config file is found correctly,
 // especially when the script is run by a process manager like PM2.
-require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
-
+const dotenvResult = require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
@@ -24,6 +24,16 @@ console.log("===================================================================
 console.log(`[INFO] Script started at: ${new Date().toISOString()}`);
 console.log("[INFO] This script should ONLY connect to MySQL, not SQLite.");
 // ===================================================================================
+
+// --- DOTENV DEBUGGING ---
+if (dotenvResult.error) {
+    console.error('\n[DEBUG] Error loading .env file:', dotenvResult.error);
+} else {
+    console.log('\n[DEBUG] .env file loaded successfully.');
+    console.log(`[DEBUG] DB_HOST from process.env is: ${process.env.DB_HOST}`);
+}
+// --- END DEBUGGING ---
+
 
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE } = process.env;
 
@@ -179,15 +189,31 @@ const seedData = async (connection) => {
     const hash = await bcrypt.hash(adminPassword, salt);
     const adminId = 'client-admin-ali';
 
+    // Use INSERT ... ON DUPLICATE KEY UPDATE to ensure the admin user is always up-to-date.
+    // This is more robust than INSERT IGNORE, as it will overwrite an existing admin
+    // user with the correct default password hash if the script is run again.
+    const adminUpsertQuery = `
+        INSERT INTO clients (id, clientId, username, password, role, isActive, prizeRates, commissionRates) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            clientId = VALUES(clientId),
+            username = VALUES(username),
+            password = VALUES(password),
+            role = VALUES(role),
+            isActive = VALUES(isActive),
+            prizeRates = VALUES(prizeRates),
+            commissionRates = VALUES(commissionRates)
+    `;
+
     await connection.query(
-        `INSERT IGNORE INTO clients (id, clientId, username, password, role, isActive, prizeRates, commissionRates) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        adminUpsertQuery,
         [
             adminId, 'admin', 'admin', hash, 'ADMIN', 1, 
             JSON.stringify({ "4D": { "first": 525000, "second": 165000 }, "3D": { "first": 80000, "second": 26000 }, "2D": { "first": 8000, "second": 2600 }, "1D": { "first": 800, "second": 260 } }),
             JSON.stringify({})
         ]
     );
-    console.log('  - Admin user seeded or already exists.');
+    console.log('  - Admin user seeded or updated successfully.');
 
     // Seed Draws
     const [rows] = await connection.query(`SELECT COUNT(*) as count FROM draws`);
