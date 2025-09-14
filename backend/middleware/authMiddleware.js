@@ -1,22 +1,25 @@
 const jwt = require('jsonwebtoken');
 const db = require('../database/db');
 
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
     let token;
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             
-            db.get('SELECT id, username, role FROM clients WHERE id = ?', [decoded.id], (err, client) => {
-                if (err || !client) {
-                    return res.status(401).json({ message: 'Not authorized, client not found' });
-                }
-                req.client = client;
-                next();
-            });
+            const [rows] = await db.query('SELECT id, username, role FROM clients WHERE id = ?', [decoded.id]);
+            const client = rows[0];
+            
+            if (!client) {
+                return res.status(401).json({ message: 'Not authorized, client not found' });
+            }
+            
+            req.client = client;
+            next();
 
         } catch (error) {
+            console.error(error);
             res.status(401).json({ message: 'Not authorized, token failed' });
         }
     }
