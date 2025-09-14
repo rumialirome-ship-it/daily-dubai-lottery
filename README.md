@@ -1,6 +1,6 @@
 # Daily Dubai Lottery Application
 
-This is a full-stack lottery application with a React frontend and an Express.js backend. This guide provides instructions for deploying the application to a Virtual Private Server (VPS).
+This is a full-stack lottery application with a React frontend and an Express.js backend using a MySQL database. This guide provides instructions for deploying the application to a Virtual Private Server (VPS).
 
 ## Deployment to VPS
 
@@ -14,15 +14,34 @@ Ensure you have the following software installed on your server.
 -   **Node.js & npm:** (Version 16.x or newer is recommended).
 -   **PM2:** A process manager for Node.js to keep your application running.
     ```bash
-    npm install pm2 -g
+    sudo npm install pm2 -g
     ```
 -   **Nginx:** A web server and reverse proxy.
+-   **MySQL Server:** The database for the application.
     ```bash
     sudo apt update
-    sudo apt install nginx
+    sudo apt install nginx git mysql-server
     ```
 
-### 2. Clone the Repository
+### 2. Set Up MySQL Database
+
+After installing MySQL, you need to create a database and a user for the application.
+
+```bash
+# Log in to MySQL as root
+sudo mysql
+
+# In the MySQL prompt, run the following commands.
+# Replace 'your_strong_password' with a secure password.
+CREATE DATABASE ddl_lottery;
+CREATE USER 'ddl_user'@'localhost' IDENTIFIED BY 'your_strong_password';
+GRANT ALL PRIVILEGES ON ddl_lottery.* TO 'ddl_user'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+**Note down the database name, username, and password.** You will need them for the `.env` configuration.
+
+### 3. Clone the Repository
 
 Clone your project's source code onto the VPS.
 
@@ -31,22 +50,29 @@ git clone <your-repository-url>
 cd <your-project-directory>
 ```
 
-### 3. Build the Frontend
+### 4. Build the Frontend
 
-The React frontend needs to be compiled into static HTML, CSS, and JavaScript files. Before running the build, you must make the Gemini API key available as an environment variable.
+The React frontend needs to be compiled into static files. The build process will also generate the necessary CSS file from Tailwind CSS.
 
+First, install all frontend and development dependencies:
 ```bash
-# Install all frontend dependencies
+# From the project's root directory
 npm install
+```
 
-# Run the build script, providing your API key
-# You can get your key from Google AI Studio
+Next, build the application. You **must** provide your Google Gemini API key as an environment variable during this step.
+```bash
+# Replace <YOUR_GEMINI_API_KEY> with your actual key
 API_KEY=<YOUR_GEMINI_API_KEY> npm run build
 ```
 
-This command will create a `dist` directory in your project root, containing the optimized frontend application with the API key embedded.
+This command creates a `dist` directory containing the optimized and production-ready frontend application.
 
-### 4. Set Up the Backend
+#### Troubleshooting the Build
+
+-   **"Gemini API Key is missing" Error:** If you see this error in the browser console after deployment, it means the `API_KEY` was not available during the `npm run build` step. The AI-powered features will be disabled. To fix this, you must re-run the build command on your server, ensuring the `API_KEY` is correctly prefixed as shown above.
+
+### 5. Set Up the Backend
 
 Navigate to the backend directory and install its dependencies.
 
@@ -55,39 +81,45 @@ cd backend
 npm install
 ```
 
-### 5. Configure Environment Variables
+### 6. Configure Environment Variables
 
-Create a `.env` file inside the `backend` directory. This file stores sensitive configuration details.
+Create a `.env` file inside the `backend` directory.
 
 ```bash
 # Still inside the 'backend' directory
 nano .env
 ```
 
-Paste the following content into the file.
--   **JWT_SECRET:** You **must** replace this with a new, long, and random secret key. You can use an online generator to create a strong key.
--   **API_KEY:** This is your Google Gemini API key, the same one you used for the frontend build.
+Paste the following content into the file, replacing the placeholder values with your actual credentials.
+-   **JWT_SECRET:** **MUST** be replaced with a new, long, random secret key.
+-   **DB_...:** Use the MySQL credentials you created in Step 2.
+-   **API_KEY:** Your Google Gemini API key.
 
 ```
 PORT=5000
 JWT_SECRET=your_super_strong_and_secret_jwt_key_here
 API_KEY=<YOUR_GEMINI_API_KEY>
+
+DB_HOST=localhost
+DB_USER=ddl_user
+DB_PASSWORD=your_strong_password
+DB_DATABASE=ddl_lottery
 ```
 
 Save the file (in `nano`, press `CTRL+X`, then `Y`, then `Enter`).
 
-### 6. Initialize the Database
+### 7. Initialize the Database
 
-Run the database initialization script. This will create the `lottery.db` file and set up the necessary tables and the default admin user.
+Run the database initialization script. This will connect to MySQL, create the necessary tables, and seed the default admin user.
 
 ```bash
 # Still inside the 'backend' directory
 npm run db:init
 ```
 
-### 7. Start the Application with PM2
+### 8. Start the Application with PM2
 
-Now, go back to the project's root directory and start the application using PM2 with the production environment settings from your `ecosystem.config.js` file.
+Go back to the project's root directory and start the application using PM2 with the production environment settings.
 
 ```bash
 # Go back to the root of your project
@@ -97,11 +129,9 @@ cd ..
 pm2 start ecosystem.config.js --env production
 ```
 
-Your application is now running! However, it's only accessible directly via port 5000. The next step is to configure Nginx to make it accessible through your domain.
+### 9. Configure Nginx and Secure with SSL
 
-### 8. Configure Nginx and Secure with SSL
-
-For a production environment on `dubailott.live`, it's essential to run your app behind Nginx as a reverse proxy.
+Configure Nginx to act as a reverse proxy for your application.
 
 #### A. Basic Nginx Configuration (HTTP)
 
@@ -110,7 +140,7 @@ Create a new Nginx configuration file for your site:
 sudo nano /etc/nginx/sites-available/dubailott.live
 ```
 
-Paste the following configuration, which forwards requests to your application running on port 5000.
+Paste the following configuration:
 
 ```nginx
 # /etc/nginx/sites-available/dubailott.live
@@ -129,41 +159,31 @@ server {
 }
 ```
 
-Enable the site by creating a symbolic link:
+Enable the site, test the configuration, and restart Nginx:
 ```bash
 sudo ln -s /etc/nginx/sites-available/dubailott.live /etc/nginx/sites-enabled/
-```
-
-Test the Nginx configuration and restart the service:
-```bash
 sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-At this point, you should be able to access your site at `http://dubailott.live`.
-
 #### B. Adding SSL with Let's Encrypt (HTTPS)
 
-First, install Certbot, the tool for obtaining SSL certificates from Let's Encrypt.
+Install Certbot for Let's Encrypt certificates.
 ```bash
-sudo apt update
 sudo apt install certbot python3-certbot-nginx
 ```
 
-Now, run Certbot. It will automatically detect your `dubailott.live` configuration, obtain a certificate, and update your Nginx file to handle HTTPS and redirect HTTP traffic.
-
+Run Certbot to automatically obtain and configure SSL for your domain.
 ```bash
 sudo certbot --nginx -d dubailott.live -d www.dubailott.live
 ```
 
-Follow the on-screen prompts. Certbot will handle the rest. Your site will now be secure and accessible at `https://dubailott.live`.
+Follow the on-screen prompts. Your site is now secure and accessible at `https://dubailott.live`.
 
-### 9. Managing the Application
-
-Here are some useful PM2 commands:
+### 10. Managing the Application
 
 -   **List running processes:** `pm2 list`
 -   **View real-time logs:** `pm2 logs ddl-backend`
 -   **Restart the application:** `pm2 restart ddl-backend`
 -   **Stop the application:** `pm2 stop ddl-backend`
--   **Save the process list to restart on server reboot:** `pm2 save`
+-   **Save the process list for server reboot:** `pm2 save`
