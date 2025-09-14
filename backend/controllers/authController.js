@@ -12,6 +12,10 @@ const generateToken = (id) => {
 const loginUser = async (req, res) => {
     const { loginIdentifier, password, role } = req.body;
 
+    if (!loginIdentifier || !password || !role) {
+        return res.status(400).json({ message: 'Login identifier, password, and role are required.' });
+    }
+
     const sql = `SELECT * FROM clients WHERE (username = ? OR clientId = ?) AND role = ?`;
     try {
         const [rows] = await db.query(sql, [loginIdentifier, loginIdentifier, role]);
