@@ -33,9 +33,9 @@ sudo mysql
 
 # In the MySQL prompt, run the following commands.
 # Replace 'your_strong_password' with a secure password.
-CREATE DATABASE ddl_lottery;
+CREATE DATABASE mydb;
 CREATE USER 'ddl_user'@'localhost' IDENTIFIED BY 'your_strong_password';
-GRANT ALL PRIVILEGES ON ddl_lottery.* TO 'ddl_user'@'localhost';
+GRANT ALL PRIVILEGES ON mydb.* TO 'ddl_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -103,7 +103,7 @@ API_KEY=<YOUR_GEMINI_API_KEY>
 DB_HOST=127.0.0.1
 DB_USER=ddl_user
 DB_PASSWORD=your_strong_password
-DB_DATABASE=ddl_lottery
+DB_DATABASE=mydb
 ```
 
 Save the file (in `nano`, press `CTRL+X`, then `Y`, then `Enter`).
