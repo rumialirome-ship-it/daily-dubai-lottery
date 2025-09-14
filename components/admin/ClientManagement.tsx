@@ -472,7 +472,7 @@ const ClientManagement = () => {
     return (
         <div>
             {notification && (
-                <div className={`fixed top-28 right-8 z-50 p-4 rounded-lg shadow-lg text-sm text-center ${notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                <div className={`fixed top-28 right-8 z-50 p-4 rounded-lg shadow-lg text-sm text-center ${notification.type === 'success' ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-red-900/50 text-red-300 border border-red-700'}`}>
                     {notification.message}
                 </div>
             )}
