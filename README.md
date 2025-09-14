@@ -25,21 +25,42 @@ Ensure you have the following software installed on your server.
 
 ### 2. Set Up MySQL Database
 
-After installing MySQL, you need to create a database and a user for the application.
+After installing MySQL, you need to create a database and a user for the application. This set of commands will completely reset the user to ensure a clean setup.
 
 ```bash
-# Log in to MySQL as root
+# Log in to MySQL as root. You may need to use 'sudo mysql'
+# and enter your root password if one is set.
 sudo mysql
 
 # In the MySQL prompt, run the following commands.
-# Replace 'your_strong_password' with a secure password.
-CREATE DATABASE mydb;
+# IMPORTANT: Replace 'your_strong_password' with the EXACT password you will use in your .env file.
+
+CREATE DATABASE IF NOT EXISTS mydb;
+DROP USER IF EXISTS 'ddl_user'@'localhost';
+DROP USER IF EXISTS 'ddl_user'@'127.0.0.1';
 CREATE USER 'ddl_user'@'localhost' IDENTIFIED BY 'your_strong_password';
+CREATE USER 'ddl_user'@'127.0.0.1' IDENTIFIED BY 'your_strong_password';
 GRANT ALL PRIVILEGES ON mydb.* TO 'ddl_user'@'localhost';
+GRANT ALL PRIVILEGES ON mydb.* TO 'ddl_user'@'127.0.0.1';
 FLUSH PRIVILEGES;
 EXIT;
 ```
-**Note down the database name, username, and password.** You will need them for the `.env` configuration.
+**Note down the database name (`mydb`), username (`ddl_user`), and the password you chose.** You will need them for the `.env` configuration.
+
+#### Verifying Permissions
+
+If the `db:init` script fails with an 'Access denied' error, it's almost always because the database user's permissions are incorrect. You can verify the permissions by logging back into MySQL and running:
+
+```sql
+-- Run these in the MySQL prompt
+SHOW GRANTS FOR 'ddl_user'@'localhost';
+SHOW GRANTS FOR 'ddl_user'@'127.0.0.1';
+```
+
+The output for **both** commands **must** include a line that looks like this:
+`GRANT ALL PRIVILEGES ON \`mydb\`.* TO \`ddl_user\`@\`...\``
+
+If you do not see `ALL PRIVILEGES`, you must run the `GRANT` commands from the section above again.
 
 ### 3. Clone the Repository
 
@@ -185,5 +206,6 @@ Follow the on-screen prompts. Your site is now secure and accessible at `https:/
 -   **List running processes:** `pm2 list`
 -   **View real-time logs:** `pm2 logs ddl-backend`
 -   **Restart the application:** `pm2 restart ddl-backend`
+-   **Restart & update environment variables:** `pm2 restart ddl-backend --update-env`
 -   **Stop the application:** `pm2 stop ddl-backend`
 -   **Save the process list for server reboot:** `pm2 save`
