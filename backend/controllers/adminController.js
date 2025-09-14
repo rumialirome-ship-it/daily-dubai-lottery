@@ -1,7 +1,8 @@
-const db = require('../database/db');
+const path = require('path');
+const db = require(path.join(__dirname, '..', 'database', 'db'));
 const bcrypt = require('bcryptjs');
-const { isBetWinner } = require('../utils/helpers');
-const { generateDrawStats, generateLiveDrawAnalysis } = require('../utils/reportHelpers');
+const { isBetWinner } = require(path.join(__dirname, '..', 'utils', 'helpers'));
+const { generateDrawStats, generateLiveDrawAnalysis } = require(path.join(__dirname, '..', 'utils', 'reportHelpers'));
 
 const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
