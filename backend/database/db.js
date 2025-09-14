@@ -57,7 +57,7 @@ const initializeDb = async () => {
             password: DB_PASSWORD,
         };
         // Connect without a specific database to create it if it doesn't exist.
-        console.log(`[INFO] Attempting to connect to MySQL server at '${connectionConfig.host}' to check for database '${DB_DATABASE}'...`);
+        console.log(`[INFO] Attempting to connect to MySQL server at '${connectionConfig.host}' as user '${connectionConfig.user}' to check for database '${DB_DATABASE}'...`);
         connection = await mysql.createConnection(connectionConfig);
         console.log("[SUCCESS] Connected to MySQL server.");
 
