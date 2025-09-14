@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "db:init": "node database/db.js"
+    "db:init": "echo '>>> EXECUTING V4 SCRIPT FROM package.json <<<' && node database/db.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
