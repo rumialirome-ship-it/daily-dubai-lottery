@@ -42,10 +42,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [currentClient, setCurrentClient] = useState<Client | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    
+    const logout = useCallback(async () => {
+        localStorage.removeItem('ddl_token');
+        setCurrentClient(null);
+        setClients([]);
+        setBets([]);
+        setTransactions([]);
+    }, []);
 
     const fetchDataForClient = useCallback(async () => {
         if (!localStorage.getItem('ddl_token')) {
-            setIsLoading(false);
             return;
         }
         try {
@@ -80,7 +87,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             console.error("Failed to fetch client data, logging out.", error);
             await logout();
         }
-    }, []);
+    }, [logout]);
 
     // Initial load and draw polling
     useEffect(() => {
@@ -110,7 +117,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 console.error("Failed to fetch data", error);
                 setError("Could not connect to the server. Please ensure the backend server is running and accessible.");
             } finally {
-                if (isInitialLoad) {
+                if (isInitialLoad && isMounted) {
                     setIsLoading(false);
                 }
                 // Schedule the next poll only if the component is still mounted.
@@ -147,13 +154,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     }, [fetchDataForClient]);
 
-    const logout = useCallback(async () => {
-        localStorage.removeItem('ddl_token');
-        setCurrentClient(null);
-        setClients([]);
-        setBets([]);
-        setTransactions([]);
-    }, []);
     
     const placeBulkBetsForCurrentClient = useCallback(async (betsToPlace: Omit<Bet, 'id' | 'clientId'>[]): Promise<{ successCount: number; message: string; }> => {
         if (!currentClient || currentClient.role !== Role.Client) {
