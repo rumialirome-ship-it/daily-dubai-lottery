@@ -1,4 +1,3 @@
-
 // Explicitly load .env file from the 'backend' directory
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -12,6 +11,7 @@ const authRoutes = require('./routes/authRoutes');
 const drawRoutes = require('./routes/drawRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const healthRoutes = require('./routes/healthRoutes');
 
 const app = express();
 
@@ -19,11 +19,35 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/draws', drawRoutes);
-app.use('/api/client', clientRoutes);
-app.use('/api/admin', adminRoutes);
+// --- API Routes with Cache Control ---
+
+// Middleware to prevent caching of any API response
+const noCache = (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    next();
+};
+
+// Create a master router for all API endpoints
+const apiRouter = express.Router();
+
+// Apply the no-cache middleware to all routes under /api
+apiRouter.use(noCache);
+
+// Register the individual route handlers
+apiRouter.use('/health', healthRoutes);
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/draws', drawRoutes);
+apiRouter.use('/client', clientRoutes);
+apiRouter.use('/admin', adminRoutes);
+
+// Mount the master API router
+app.use('/api', apiRouter);
+
+// --- End API Routes ---
+
 
 // --- Static File Serving for Frontend ---
 // This must come AFTER the API routes
