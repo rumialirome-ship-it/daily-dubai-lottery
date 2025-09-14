@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/authMiddleware');
+const path = require('path');
+const { protect } = require(path.join(__dirname, '..', 'middleware', 'authMiddleware'));
 const { 
     getClientData,
     getClientBets,
     getClientTransactions,
     placeBets,
     updateClientCredentials
-} = require('../controllers/clientController');
+} = require(path.join(__dirname, '..', 'controllers', 'clientController'));
 
 // All routes in this file are protected
 router.use(protect);
