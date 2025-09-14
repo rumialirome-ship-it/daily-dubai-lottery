@@ -1,7 +1,10 @@
-require('dotenv').config();
+
+// Explicitly load .env file from the 'backend' directory
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const db = require('./database/db');
 
 // Route imports
