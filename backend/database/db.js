@@ -154,12 +154,14 @@ const initializeDb = async () => {
         console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         console.error('Error during database initialization:', err);
         console.error("\n[TROUBLESHOOTING]");
-        console.error("1. Ensure the database 'mydb' (or the one you set in .env) has been created in MySQL.");
-        console.error("   You can create it by logging into MySQL as root and running: CREATE DATABASE IF NOT EXISTS mydb;");
-        console.error("2. Verify the DB_HOST, DB_USER, DB_PASSWORD, and DB_DATABASE in your 'backend/.env' file are correct.");
-        console.error("3. Ensure the MySQL server is running. You can check with 'sudo systemctl status mysql'.");
-        console.error("4. Check that the user 'ddl_user' has ALL PRIVILEGES on the database. See README.md for the GRANT command.");
-        console.error("5. If the error is ECONNREFUSED, ensure DB_HOST is '127.0.0.1' and not 'localhost'.");
+        console.error("1. VERIFY PERMISSIONS (Most Likely Cause): This error means the 'ddl_user' lacks permission to CREATE tables.");
+        console.error("   - Log into MySQL as root (`sudo mysql`) and run the following command:");
+        console.error("     SHOW GRANTS FOR 'ddl_user'@'localhost';");
+        console.error("   - The output MUST show a line like: GRANT ALL PRIVILEGES ON `mydb`.* TO `ddl_user`@`localhost`");
+        console.error("   - If it doesn't, you must re-run the GRANT command from the README.md file.");
+        console.error("2. Ensure the database 'mydb' (or your .env equivalent) exists and the user can access it.");
+        console.error("3. Double-check the DB_HOST, DB_USER, DB_PASSWORD, and DB_DATABASE in your 'backend/.env' file.");
+        console.error("4. If the error is ECONNREFUSED, ensure DB_HOST is '127.0.0.1' and not 'localhost'.");
         console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         throw err; // Throw error to stop the script
     } finally {
