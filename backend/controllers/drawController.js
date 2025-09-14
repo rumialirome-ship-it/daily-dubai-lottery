@@ -1,5 +1,6 @@
-const db = require('../database/db');
-const { getDynamicDrawStatus } = require('../utils/drawHelpers');
+const path = require('path');
+const db = require(path.join(__dirname, '..', 'database', 'db'));
+const { getDynamicDrawStatus } = require(path.join(__dirname, '..', 'utils', 'drawHelpers'));
 
 const getDraws = async (req, res) => {
     try {
