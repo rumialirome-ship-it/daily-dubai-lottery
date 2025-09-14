@@ -1,0 +1,6 @@
+{
+  "name": "Daily Dubai Lottery",
+  "description": "A full-featured lottery game application with admin and user roles, powered by Gemini Smart.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
