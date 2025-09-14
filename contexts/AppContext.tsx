@@ -84,24 +84,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Initial load and draw polling
     useEffect(() => {
-        const fetchInitialData = async () => {
-            setIsLoading(true);
+        let isMounted = true;
+        const POLLING_INTERVAL = 15000;
+        let timeoutId: number;
+
+        const poll = async (isInitialLoad: boolean) => {
+            // Only show the full-page loader on the very first load.
+            // Subsequent polls will happen in the background to avoid UI flashing.
+            if (isInitialLoad) {
+                setIsLoading(true);
+            }
+            
             try {
                 const drawsData = await apiFetch('/draws');
+                // Stop further execution if component has unmounted during an async operation
+                if (!isMounted) return;
+
                 setDraws(drawsData.map((d: Draw) => ({ ...d, drawTime: new Date(d.drawTime) })));
                 await fetchDataForClient();
-                setError(null); // Clear error on successful fetch
+
+                if (!isMounted) return;
+                setError(null); // Clear any previous error on a successful fetch
             } catch (error) {
-                console.error("Failed to fetch initial data", error);
+                if (!isMounted) return;
+                console.error("Failed to fetch data", error);
                 setError("Could not connect to the server. Please ensure the backend server is running and accessible.");
             } finally {
-                setIsLoading(false);
+                if (isInitialLoad) {
+                    setIsLoading(false);
+                }
+                // Schedule the next poll only if the component is still mounted.
+                // This creates a robust loop that waits for the previous fetch to complete.
+                if (isMounted) {
+                    timeoutId = window.setTimeout(() => poll(false), POLLING_INTERVAL);
+                }
             }
         };
+        
+        poll(true); // Start the first fetch, flagging it as the initial load.
 
-        fetchInitialData();
-        const intervalId = setInterval(fetchInitialData, 15000); // Poll every 15 seconds
-        return () => clearInterval(intervalId);
+        // Cleanup function to stop polling when the component unmounts.
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
     }, [fetchDataForClient]);
 
     const login = useCallback(async (loginIdentifier: string, password: string, role: Role): Promise<{ success: boolean; message?: string }> => {
