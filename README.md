@@ -100,7 +100,7 @@ PORT=5000
 JWT_SECRET=your_super_strong_and_secret_jwt_key_here
 API_KEY=<YOUR_GEMINI_API_KEY>
 
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_USER=ddl_user
 DB_PASSWORD=your_strong_password
 DB_DATABASE=ddl_lottery
@@ -149,7 +149,7 @@ server {
     server_name dubailott.live www.dubailott.live;
 
     location / {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://127.0.0.1:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
