@@ -1,5 +1,10 @@
 
-require('dotenv').config();
+const path = require('path');
+// Explicitly load .env from the parent 'backend' directory.
+// This ensures that this script can be run directly (e.g., for db:init)
+// and also works correctly when required by server.js run via PM2.
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
