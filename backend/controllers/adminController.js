@@ -176,7 +176,7 @@ const declareWinner = async (req, res) => {
             return res.status(404).json({ message: "Draw not found." });
         }
 
-        const [relevantBets] = await connection.execute("SELECT * FROM bets WHERE drawId = ?", [drawId]);
+        const [relevantBets] = await connection.execute("SELECT *, bettingCondition as `condition` FROM bets WHERE drawId = ?", [drawId]);
         const [allClients] = await connection.execute("SELECT * FROM clients FOR UPDATE");
         
         const clientMap = new Map(allClients.map(c => [c.id, { ...c, prizeRates: JSON.parse(c.prizeRates || '{}'), commissionRates: JSON.parse(c.commissionRates || '{}') }]));
@@ -289,7 +289,7 @@ const placeBetsForClient = async (req, res) => {
         await connection.execute("INSERT INTO transactions (id, clientId, type, amount, description, balanceAfter, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", Object.values(newTransaction));
         
         if (betsToPlace.length > 0) {
-            const betInsertSql = "INSERT INTO bets (id, clientId, drawId, gameType, number, stake, createdAt, condition, positions) VALUES ?";
+            const betInsertSql = "INSERT INTO bets (id, clientId, drawId, gameType, number, stake, createdAt, bettingCondition, positions) VALUES ?";
             const betValues = betsToPlace.map(bet => [
                 `bet-admin-${generateUniqueId()}`, clientId, bet.drawId, bet.gameType, bet.number, bet.stake, new Date(), bet.condition, JSON.stringify(bet.positions || null)
             ]);
@@ -310,7 +310,7 @@ const placeBetsForClient = async (req, res) => {
 
 const getAllBets = async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT * FROM bets ORDER BY createdAt DESC");
+        const [rows] = await db.query("SELECT *, bettingCondition as `condition` FROM bets ORDER BY createdAt DESC");
         res.json(rows);
     } catch(error) {
         res.status(500).json({ message: error.message });
