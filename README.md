@@ -70,19 +70,22 @@ FLUSH PRIVILEGES;
 EXIT;
 ```
 
-You will need to create the tables required by the application in the `mydb` database. Refer to the table schema shown in the prompt for the required table structures (`users`, `clients`, `draws`, `bets`, `transactions`, etc.).
+#### 4.1. Create Database Schema and Seed Data
 
-#### 4.1. Seed Initial Data (Important)
-
-After creating the database tables, run the seed script to create a default admin user and a sample client. This will allow you to log in for the first time.
+The application includes a script to automatically set up the database tables and initial user accounts. Run this script from the `backend` directory.
 
 ```bash
-# From your project's root directory, go to the backend
+# From your project's root directory, navigate to the backend
 cd backend
 
-# Run the seed script
+# This command will create all necessary tables and seed initial data
 npm run db:seed
 ```
+
+This single command performs the following actions:
+1.  **Creates Schema:** Creates all required tables (`users`, `clients`, `draws`, `bets`, `transactions`) if they don't already exist.
+2.  **Seeds Draws:** Populates the `draws` table with the full schedule for the current day.
+3.  **Seeds Users:** Creates a default admin user and a sample client to allow you to log in for the first time.
 
 This will create:
 -   An **admin** user with username `01` and password `password`.
@@ -95,7 +98,7 @@ This will create:
 Navigate to the backend directory and install its dependencies.
 
 ```bash
-cd backend
+# This assumes you are already in the backend directory from the previous step
 npm install
 ```
 
@@ -117,7 +120,7 @@ Paste the following content into the file.
 PORT=5000
 JWT_SECRET=your_super_strong_and_secret_jwt_key_here
 API_KEY=AIzaSyCF0j0LFCwPdpz30sdfiyEHG44qlLIGW1Q
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_USER=ddl_user
 DB_PASSWORD=your_strong_password
 DB_DATABASE=mydb
