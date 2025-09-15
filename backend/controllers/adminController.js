@@ -2,6 +2,7 @@ const db = require('../database/db');
 const bcrypt = require('bcryptjs');
 const { isBetWinner } = require('../utils/helpers');
 const { generateDrawStats, generateLiveDrawAnalysis } = require('../utils/reportHelpers');
+const { normalizeClientData } = require('../utils/dataHelpers');
 
 const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
@@ -9,8 +10,8 @@ const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(
 
 const getAllClients = async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT id, clientId, username, role, wallet, area, contact, isActive FROM clients");
-        res.json(rows);
+        const [rows] = await db.query("SELECT * FROM clients");
+        res.json(rows.map(normalizeClientData));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -18,14 +19,10 @@ const getAllClients = async (req, res) => {
 
 const getClientById = async (req, res) => {
     try {
-        const [rows] = await db.execute("SELECT id, clientId, username, role, wallet, area, contact, isActive, commissionRates, prizeRates FROM clients WHERE id = ?", [req.params.id]);
+        const [rows] = await db.execute("SELECT * FROM clients WHERE id = ?", [req.params.id]);
         const client = rows[0];
         if (!client) return res.status(404).json({ message: "Client not found" });
-        res.json({
-            ...client,
-            commissionRates: JSON.parse(client.commissionRates || '{}'),
-            prizeRates: JSON.parse(client.prizeRates || '{}'),
-        });
+        res.json(normalizeClientData(client));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -56,7 +53,7 @@ const registerClient = async (req, res) => {
         const sql = "INSERT INTO clients (id, clientId, username, password, role, wallet, area, contact, isActive, commissionRates, prizeRates) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         await db.execute(sql, Object.values(newClient));
         
-        res.status(201).json({ ...newClient, password: '' });
+        res.status(201).json(normalizeClientData(newClient));
 
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -89,7 +86,7 @@ const updateClientDetails = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ message: "Client not found." });
         
         const [updatedRows] = await db.execute("SELECT * FROM clients WHERE id = ?", [id]);
-        res.json({ ...updatedRows[0], password: '' });
+        res.json(normalizeClientData(updatedRows[0]));
 
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -150,7 +147,7 @@ const adjustClientWallet = async (req, res) => {
         await connection.commit();
         
         const [updatedClientRows] = await db.execute("SELECT * from clients WHERE id = ?", [clientId]);
-        res.json({ ...updatedClientRows[0], password: '' });
+        res.json(normalizeClientData(updatedClientRows[0]));
 
     } catch (error) {
         await connection.rollback();
