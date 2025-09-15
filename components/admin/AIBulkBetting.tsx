@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import { parseMessageWithRules } from '../../services/RuleBasedParser.ts';
-import { ParsedBet, GameType, Role, BettingCondition } from '../../types/index.ts';
-import { getGameTypeDisplayName } from '../../utils/helpers.ts';
+import { useAppContext } from '../../contexts/AppContext';
+import { parseMessageWithRules } from '../../services/RuleBasedParser';
+import { ParsedBet, GameType, Role, BettingCondition } from '../../types';
+import { getGameTypeDisplayName } from '../../utils/helpers';
 
 const SmartBulkBetting = () => {
     const { clients, draws, placeBetsForClient } = useAppContext();
