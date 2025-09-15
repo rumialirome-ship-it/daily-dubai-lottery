@@ -75,7 +75,7 @@ const createTablesSQL = [
 
 
 async function setupAndSeedDatabase() {
-    console.log('Starting full database setup (Schema + Seed)...');
+    console.log('Starting full database setup (Schema + Seed/Reset)...');
     let connection;
 
     try {
@@ -122,54 +122,64 @@ async function setupAndSeedDatabase() {
         }
 
 
-        // --- 3. Seed Admin User ---
-        const [adminRows] = await connection.execute('SELECT * FROM users WHERE username = ?', ['01']);
+        // --- 3. Seed/Update Admin User ---
+        // This logic ensures the admin user exists and has the default password.
+        const adminUsername = '01';
+        const adminPassword = 'password';
+        const adminHashedPassword = await bcrypt.hash(adminPassword, 10);
+
+        const [adminRows] = await connection.execute('SELECT id FROM users WHERE username = ?', [adminUsername]);
         if (adminRows.length === 0) {
-            console.log("Admin user '01' not found. Creating...");
-            const adminPassword = 'password'; // Default password
-            const hashedPassword = await bcrypt.hash(adminPassword, 10);
+            console.log(`Admin user '${adminUsername}' not found. Creating...`);
             const adminId = `admin-${Date.now()}`;
             await connection.execute(
                 'INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)',
-                [adminId, '01', hashedPassword, 'ADMIN']
+                [adminId, adminUsername, adminHashedPassword, 'ADMIN']
             );
-            console.log("✅ Admin user '01' created with default password 'password'.");
-            console.log("   IMPORTANT: Change this password immediately after logging in.");
+            console.log(`✅ Admin user '${adminUsername}' created with default password 'password'.`);
         } else {
-            console.log("ℹ️ Admin user '01' already exists. Skipping.");
+            console.log(`Admin user '${adminUsername}' found. Ensuring default password is set...`);
+            await connection.execute(
+                'UPDATE users SET password = ? WHERE username = ?',
+                [adminHashedPassword, adminUsername]
+            );
+            console.log(`✅ Admin user '${adminUsername}' password has been reset to 'password'.`);
         }
         
-        // --- 4. Seed Sample Client User ---
-        const [clientRows] = await connection.execute('SELECT * FROM clients WHERE clientId = ?', ['02']);
+        // --- 4. Seed/Update Sample Client User ---
+        // This logic ensures the sample client exists and has the default password.
+        const clientIdentifier = '02';
+        const clientUsername = 'Sample Client';
+        const clientPassword = 'password';
+        const clientHashedPassword = await bcrypt.hash(clientPassword, 10);
+        
+        const [clientRows] = await connection.execute('SELECT id FROM clients WHERE clientId = ?', [clientIdentifier]);
         if (clientRows.length === 0) {
-            console.log("Sample client '02' not found. Creating...");
-            const clientPassword = 'password';
-            const hashedPassword = await bcrypt.hash(clientPassword, 10);
+            console.log(`Sample client '${clientIdentifier}' not found. Creating...`);
             const clientId = `client-${Date.now()}`;
-
             await connection.execute(
                 `INSERT INTO clients (id, clientId, username, password, role, wallet, area, contact, isActive, commissionRates, prizeRates) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
-                    clientId,
-                    '02', // The requested client ID
-                    'Sample Client',
-                    hashedPassword,
-                    'CLIENT',
-                    10000,
-                    'Dubai',
-                    '123456789',
-                    1, // isActive = true
+                    clientId, clientIdentifier, clientUsername, clientHashedPassword, 'CLIENT',
+                    10000, 'Dubai', '123456789', 1,
                     JSON.stringify(defaultCommissionRates),
                     JSON.stringify(defaultPrizeRates)
                 ]
             );
-            console.log("✅ Sample client '02' created with username 'Sample Client' and password 'password'.");
+            console.log(`✅ Sample client '${clientIdentifier}' created with username '${clientUsername}' and password 'password'.`);
         } else {
-             console.log("ℹ️ Client with ID '02' already exists. Skipping.");
+             console.log(`Sample client '${clientIdentifier}' found. Ensuring default password is set...`);
+             await connection.execute(
+                'UPDATE clients SET password = ? WHERE clientId = ?',
+                [clientHashedPassword, clientIdentifier]
+             );
+             console.log(`✅ Sample client '${clientIdentifier}' password has been reset to 'password'.`);
         }
+        
+        console.log('\nDatabase setup and seed/reset complete!');
+        console.log("   IMPORTANT: For security, change default passwords immediately after logging in.");
 
-        console.log('\nDatabase setup and seed complete!');
     } catch (error) {
         console.error('❌ Error during database setup:', error);
         process.exit(1);
