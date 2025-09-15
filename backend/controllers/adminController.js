@@ -1,8 +1,7 @@
-const path = require('path');
-const db = require(path.join(__dirname, '..', 'database', 'db'));
+const db = require('../database/db');
 const bcrypt = require('bcryptjs');
-const { isBetWinner } = require(path.join(__dirname, '..', 'utils', 'helpers'));
-const { generateDrawStats, generateLiveDrawAnalysis } = require(path.join(__dirname, '..', 'utils', 'reportHelpers'));
+const { isBetWinner } = require('../utils/helpers');
+const { generateDrawStats, generateLiveDrawAnalysis } = require('../utils/reportHelpers');
 
 const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
@@ -12,15 +11,14 @@ const getAllClients = async (req, res) => {
     try {
         const [rows] = await db.query("SELECT id, clientId, username, role, wallet, area, contact, isActive FROM clients");
         res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
 const getClientById = async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT id, clientId, username, role, wallet, area, contact, isActive, commissionRates, prizeRates FROM clients WHERE id = ?", [req.params.id]);
+        const [rows] = await db.execute("SELECT id, clientId, username, role, wallet, area, contact, isActive, commissionRates, prizeRates FROM clients WHERE id = ?", [req.params.id]);
         const client = rows[0];
         if (!client) return res.status(404).json({ message: "Client not found" });
         res.json({
@@ -28,9 +26,8 @@ const getClientById = async (req, res) => {
             commissionRates: JSON.parse(client.commissionRates || '{}'),
             prizeRates: JSON.parse(client.prizeRates || '{}'),
         });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -38,7 +35,7 @@ const registerClient = async (req, res) => {
     const { clientId, username, password, contact, area, wallet, commissionRates, prizeRates } = req.body;
     
     try {
-        const [existing] = await db.query("SELECT * FROM clients WHERE clientId = ? OR username = ?", [clientId, username]);
+        const [existing] = await db.execute("SELECT * FROM clients WHERE clientId = ? OR username = ?", [clientId, username]);
         if (existing.length > 0) {
             return res.status(400).json({ message: "Client ID or Username already exists." });
         }
@@ -47,20 +44,22 @@ const registerClient = async (req, res) => {
         
         const newClient = {
             id: `client-${Date.now()}`,
+            clientId, username, password: hash,
             role: 'CLIENT',
-            isActive: true,
-            clientId, username, password: hash, contact, area,
             wallet: wallet || 0,
+            area, contact,
+            isActive: 1, // Use 1 for true in MySQL
             commissionRates: JSON.stringify(commissionRates || {}),
             prizeRates: JSON.stringify(prizeRates || {})
         };
 
-        await db.query("INSERT INTO clients SET ?", newClient);
+        const sql = "INSERT INTO clients (id, clientId, username, password, role, wallet, area, contact, isActive, commissionRates, prizeRates) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        await db.execute(sql, Object.values(newClient));
+        
         res.status(201).json({ ...newClient, password: '' });
 
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -68,33 +67,32 @@ const updateClientDetails = async (req, res) => {
     const { id } = req.params;
     const { clientId, username, contact, area, isActive, commissionRates, prizeRates } = req.body;
 
-    const fields = { clientId, username, contact, area, isActive, 
-        commissionRates: commissionRates !== undefined ? JSON.stringify(commissionRates) : undefined,
-        prizeRates: prizeRates !== undefined ? JSON.stringify(prizeRates) : undefined,
-    };
-    
-    const updates = Object.entries(fields)
-        .filter(([, value]) => value !== undefined)
-        .map(([key]) => `${key} = ?`);
-
-    if (updates.length === 0) {
-        return res.status(400).json({ message: "No update fields provided." });
-    }
-    
-    const values = Object.values(fields).filter(v => v !== undefined);
-
     try {
+        const fields = { clientId, username, contact, area, isActive, 
+            commissionRates: commissionRates !== undefined ? JSON.stringify(commissionRates) : undefined,
+            prizeRates: prizeRates !== undefined ? JSON.stringify(prizeRates) : undefined
+        };
+        
+        const updates = Object.entries(fields)
+            .filter(([, value]) => value !== undefined)
+            .map(([key]) => `${key} = ?`);
+
+        if (updates.length === 0) {
+            return res.status(400).json({ message: "No update fields provided." });
+        }
+        
+        const values = Object.values(fields).filter(v => v !== undefined);
+
         const sql = `UPDATE clients SET ${updates.join(', ')} WHERE id = ?`;
-        const [result] = await db.query(sql, [...values, id]);
+        const [result] = await db.execute(sql, [...values, id]);
 
         if (result.affectedRows === 0) return res.status(404).json({ message: "Client not found." });
         
-        const [updatedRows] = await db.query("SELECT * FROM clients WHERE id = ?", [id]);
+        const [updatedRows] = await db.execute("SELECT * FROM clients WHERE id = ?", [id]);
         res.json({ ...updatedRows[0], password: '' });
 
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -105,64 +103,60 @@ const changeClientPassword = async (req, res) => {
     }
     try {
         const hash = await bcrypt.hash(newPassword, 10);
-        const [result] = await db.query("UPDATE clients SET password = ? WHERE id = ?", [hash, req.params.id]);
+        const [result] = await db.execute("UPDATE clients SET password = ? WHERE id = ?", [hash, req.params.id]);
 
         if (result.affectedRows === 0) return res.status(404).json({ message: "Client not found." });
         res.status(204).send();
-    } catch(err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
 const adjustClientWallet = async (req, res) => {
     const { amount, type, description } = req.body;
     const clientId = req.params.id;
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) return res.status(400).json({ message: "Amount must be a positive number." });
+    if (amount <= 0) return res.status(400).json({ message: "Amount must be positive." });
 
-    let connection;
+    const connection = await db.getConnection();
     try {
-        connection = await db.getConnection();
         await connection.beginTransaction();
 
-        const [rows] = await connection.query("SELECT wallet FROM clients WHERE id = ? FOR UPDATE", [clientId]);
+        const [rows] = await connection.execute("SELECT wallet FROM clients WHERE id = ? FOR UPDATE", [clientId]);
         const client = rows[0];
         if (!client) {
             await connection.rollback();
             return res.status(404).json({ message: "Client not found." });
         }
 
-        let newBalance = parseFloat(client.wallet);
+        let newBalance = client.wallet;
         if (type === 'DEBIT') {
-            if (newBalance < parsedAmount) {
+            if (client.wallet < amount) {
                 await connection.rollback();
                 return res.status(400).json({ message: "Insufficient funds." });
             }
-            newBalance -= parsedAmount;
+            newBalance -= amount;
         } else {
-            newBalance += parsedAmount;
+            newBalance += amount;
         }
 
         const newTransaction = {
-            id: `txn-${Date.now()}`, clientId, type, amount: parsedAmount, description,
-            balanceAfter: newBalance, createdAt: new Date(),
+            id: `txn-${Date.now()}`, clientId, type, amount, description,
+            balanceAfter: newBalance, createdAt: new Date()
         };
 
-        await connection.query("UPDATE clients SET wallet = ? WHERE id = ?", [newBalance, clientId]);
-        await connection.query("INSERT INTO transactions SET ?", newTransaction);
+        await connection.execute("UPDATE clients SET wallet = ? WHERE id = ?", [newBalance, clientId]);
+        await connection.execute("INSERT INTO transactions (id, clientId, type, amount, description, balanceAfter, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", Object.values(newTransaction));
         
         await connection.commit();
         
-        const [updatedClientRows] = await db.query("SELECT * FROM clients WHERE id = ?", [clientId]);
+        const [updatedClientRows] = await db.execute("SELECT * from clients WHERE id = ?", [clientId]);
         res.json({ ...updatedClientRows[0], password: '' });
 
-    } catch (err) {
-        if (connection) await connection.rollback();
-        console.error(err);
-        res.status(500).json({ message: "Transaction failed." });
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({message: "Transaction failed."});
     } finally {
-        if (connection) connection.release();
+        connection.release();
     }
 };
 
@@ -175,70 +169,81 @@ const declareWinner = async (req, res) => {
         return res.status(400).json({ message: "Winning numbers must be an array of 4 strings." });
     }
 
-    let connection;
+    const connection = await db.getConnection();
     try {
-        connection = await db.getConnection();
         await connection.beginTransaction();
 
-        const [drawRows] = await connection.query("SELECT * FROM draws WHERE id = ?", [drawId]);
-        const draw = drawRows[0];
-        if (!draw) {
+        const [draws] = await connection.execute("SELECT * FROM draws WHERE id = ?", [drawId]);
+        if (draws.length === 0) {
             await connection.rollback();
             return res.status(404).json({ message: "Draw not found." });
         }
 
-        const [relevantBets] = await connection.query("SELECT * FROM bets WHERE drawId = ?", [drawId]);
-        const [allClients] = await connection.query("SELECT * FROM clients");
-        const clientMap = new Map(allClients.map(c => [c.id, { ...c, wallet: parseFloat(c.wallet), prizeRates: JSON.parse(c.prizeRates || '{}'), commissionRates: JSON.parse(c.commissionRates || '{}') }]));
+        const [relevantBets] = await connection.execute("SELECT * FROM bets WHERE drawId = ?", [drawId]);
+        const [allClients] = await connection.execute("SELECT * FROM clients FOR UPDATE");
+        
+        const clientMap = new Map(allClients.map(c => [c.id, { ...c, prizeRates: JSON.parse(c.prizeRates || '{}'), commissionRates: JSON.parse(c.commissionRates || '{}') }]));
 
         const walletAdjustments = new Map();
         const newTransactions = [];
 
+        // Calculate winnings
         relevantBets.forEach(bet => {
             if (isBetWinner(bet, winningNumbers)) {
                 const client = clientMap.get(bet.clientId);
                 if (!client) return;
-                const rate = client.prizeRates?.[bet.gameType]?.[bet.condition.toLowerCase()];
+                const rateKey = bet.condition.toLowerCase();
+                const rate = client.prizeRates?.[bet.gameType]?.[rateKey];
                 if (rate) {
-                    const winnings = parseFloat(bet.stake) * (rate / 100);
+                    const winnings = bet.stake * (rate / 100);
                     walletAdjustments.set(client.id, (walletAdjustments.get(client.id) || 0) + winnings);
                     newTransactions.push({
                         id: `txn-win-${bet.id}`, clientId: client.id, type: 'CREDIT', amount: winnings,
-                        description: `Prize Money: Winnings for Draw ${draw.name}`, createdAt: new Date(), relatedId: draw.id,
+                        description: `Prize Money: Winnings for Draw ${draws[0].name}`, createdAt: new Date(), relatedId: drawId,
                     });
                 }
             }
         });
 
+        // Calculate commissions
         const clientStakeTotals = new Map();
-        relevantBets.forEach(bet => clientStakeTotals.set(bet.clientId, (clientStakeTotals.get(bet.clientId) || 0) + parseFloat(bet.stake)));
+        relevantBets.forEach(bet => {
+            clientStakeTotals.set(bet.clientId, (clientStakeTotals.get(bet.clientId) || 0) + bet.stake);
+        });
 
         clientStakeTotals.forEach((totalStake, clientId) => {
             const client = clientMap.get(clientId);
             if (client) {
-                const commissionRate = client.commissionRates?.['4D'] || 0;
+                // This logic is a bit ambiguous, using 4D as a default. It's kept from original.
+                const commissionRate = client.commissionRates?.['4D'] || 0; 
                 if (commissionRate > 0) {
                     const commission = totalStake * (commissionRate / 100);
                     walletAdjustments.set(clientId, (walletAdjustments.get(clientId) || 0) + commission);
                      newTransactions.push({
-                        id: `txn-comm-${clientId}-${draw.id}`, clientId, type: 'CREDIT', amount: commission,
-                        description: `Commission: Earned for Draw ${draw.name}`, createdAt: new Date(), relatedId: draw.id
+                        id: `txn-comm-${clientId}-${drawId}`, clientId, type: 'CREDIT', amount: commission,
+                        description: `Commission: Earned for Draw ${draws[0].name}`, createdAt: new Date(), relatedId: drawId
                     });
                 }
             }
         });
+        
+        // Update Draw
+        await connection.execute("UPDATE draws SET winningNumbers = ?, status = 'FINISHED' WHERE id = ?", [JSON.stringify(winningNumbers), drawId]);
 
-        await connection.query("UPDATE draws SET winningNumbers = ?, status = 'FINISHED' WHERE id = ?", [JSON.stringify(winningNumbers), drawId]);
-
+        // Apply wallet changes and add transactions
         for (const [clientId, adjustment] of walletAdjustments.entries()) {
-             const client = clientMap.get(clientId);
-             if (client) {
+            const client = clientMap.get(clientId);
+            if(client) {
                 const newBalance = client.wallet + adjustment;
-                await connection.query("UPDATE clients SET wallet = ? WHERE id = ?", [newBalance, clientId]);
+                await connection.execute("UPDATE clients SET wallet = ? WHERE id = ?", [newBalance, clientId]);
                 
                 const clientTransactions = newTransactions.filter(t => t.clientId === clientId);
-                for (const t of clientTransactions) {
-                    await connection.query("INSERT INTO transactions SET ?", { ...t, balanceAfter: newBalance });
+                for(const t of clientTransactions) {
+                    // Update balance for transaction record just before inserting
+                    t.balanceAfter = newBalance;
+                    await connection.execute("INSERT INTO transactions (id, clientId, type, amount, description, balanceAfter, createdAt, relatedId) VALUES (?,?,?,?,?,?,?,?)",
+                        [t.id, t.clientId, t.type, t.amount, t.description, t.balanceAfter, t.createdAt, t.relatedId]
+                    );
                 }
             }
         }
@@ -247,62 +252,62 @@ const declareWinner = async (req, res) => {
         res.status(200).json({ message: "Winners declared successfully." });
 
     } catch (error) {
-        if (connection) await connection.rollback();
-        console.error(error);
-        res.status(500).json({ message: error.message });
+        await connection.rollback();
+        console.error("Declare winner error:", error);
+        res.status(500).json({ message: "Failed to commit winner declaration." });
     } finally {
-        if (connection) connection.release();
+        connection.release();
     }
 };
 
 // === Betting ===
 const placeBetsForClient = async (req, res) => {
     const { bets: betsToPlace, clientId } = req.body;
-    let connection;
+
+    const connection = await db.getConnection();
     try {
-        connection = await db.getConnection();
         await connection.beginTransaction();
 
-        const [rows] = await connection.query("SELECT * FROM clients WHERE id = ? FOR UPDATE", [clientId]);
-        const client = rows[0];
+        const [clientRows] = await connection.execute("SELECT * FROM clients WHERE id = ? FOR UPDATE", [clientId]);
+        const client = clientRows[0];
         if (!client) {
             await connection.rollback();
             return res.status(404).json({ message: "Client not found." });
         }
 
         const totalStake = betsToPlace.reduce((sum, bet) => sum + bet.stake, 0);
-        if (parseFloat(client.wallet) < totalStake) {
+        if (client.wallet < totalStake) {
             await connection.rollback();
-            return res.status(400).json({ message: `Insufficient funds. Wallet: ${parseFloat(client.wallet).toFixed(2)}, Required: ${totalStake.toFixed(2)}` });
+            return res.status(400).json({ message: `Insufficient funds. Wallet: ${client.wallet.toFixed(2)}, Required: ${totalStake.toFixed(2)}` });
         }
 
-        const newBalance = parseFloat(client.wallet) - totalStake;
+        const newBalance = client.wallet - totalStake;
+        await connection.execute("UPDATE clients SET wallet = ? WHERE id = ?", [newBalance, clientId]);
+        
         const newTransaction = {
             id: `txn-admin-${Date.now()}`, clientId, type: 'DEBIT', amount: totalStake,
             description: `Booking by Admin: ${betsToPlace.length} bet(s)`,
             balanceAfter: newBalance, createdAt: new Date()
         };
-
-        await connection.query("UPDATE clients SET wallet = ? WHERE id = ?", [newBalance, clientId]);
-        await connection.query("INSERT INTO transactions SET ?", newTransaction);
+        await connection.execute("INSERT INTO transactions (id, clientId, type, amount, description, balanceAfter, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", Object.values(newTransaction));
         
-        for (const bet of betsToPlace) {
-            const newBet = {
-                id: `bet-admin-${generateUniqueId()}`, clientId, drawId: bet.drawId, 
-                gameType: bet.gameType, number: bet.number, stake: bet.stake, 
-                createdAt: new Date(), condition: bet.condition
-            };
-            await connection.query("INSERT INTO bets SET ?", newBet);
+        if (betsToPlace.length > 0) {
+            const betInsertSql = "INSERT INTO bets (id, clientId, drawId, gameType, number, stake, createdAt, condition, positions) VALUES ?";
+            const betValues = betsToPlace.map(bet => [
+                `bet-admin-${generateUniqueId()}`, clientId, bet.drawId, bet.gameType, bet.number, bet.stake, new Date(), bet.condition, JSON.stringify(bet.positions || null)
+            ]);
+            await connection.query(betInsertSql, [betValues]);
         }
 
         await connection.commit();
         res.status(201).json({ successCount: betsToPlace.length, message: `Successfully placed ${betsToPlace.length} bets for ${client.username}.` });
-    } catch (err) {
-        if (connection) await connection.rollback();
-        console.error(err);
+
+    } catch (error) {
+        await connection.rollback();
+        console.error("Place bets for client error:", error);
         res.status(500).json({ message: "Transaction failed." });
     } finally {
-        if (connection) connection.release();
+        connection.release();
     }
 };
 
@@ -310,9 +315,8 @@ const getAllBets = async (req, res) => {
     try {
         const [rows] = await db.query("SELECT * FROM bets ORDER BY createdAt DESC");
         res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+    } catch(error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -320,9 +324,8 @@ const getAllTransactions = async (req, res) => {
     try {
         const [rows] = await db.query("SELECT * FROM transactions ORDER BY createdAt DESC");
         res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+    } catch(error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
