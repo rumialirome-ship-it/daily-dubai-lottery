@@ -1,5 +1,5 @@
-import { Bet, GameType, BettingCondition, Draw, DrawStatus, Client, MarketOverride } from '../types/index.ts';
-import { defaultPrizeRates, defaultCommissionRates } from '../data/mockData.ts';
+import { Bet, GameType, BettingCondition, Draw, DrawStatus, Client, MarketOverride } from '../types';
+import { defaultPrizeRates, defaultCommissionRates } from '../data/mockData';
 
 export const normalizeClientData = (client: Partial<Client>): Client => {
     if (!client) return {} as Client;
