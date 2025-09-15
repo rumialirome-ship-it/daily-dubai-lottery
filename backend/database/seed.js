@@ -70,9 +70,11 @@ async function seedDatabase() {
             await connection.release();
             console.log('Database connection released.');
         }
-        // End the pool to allow the script to exit cleanly.
-        await dbPool.end();
-        console.log('Connection pool closed.');
+        // NOTE: We do NOT end the pool here (dbPool.end()).
+        // The pool is shared with the main application. Ending it here would
+        // break the running server. The script will exit and the OS will
+        // clean up the connection handle automatically.
+        console.log('Seed script finished.');
     }
 }
 
