@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import { GameType, Draw, BettingCondition, Bet } from '../../types/index.ts';
-import BettingForm from './BettingForm.tsx';
-import ComboForm from './KainchiForm.tsx';
-import PositionalBettingForm from './PositionalBettingForm.tsx';
+import { useAppContext } from '../../contexts/AppContext';
+import { GameType, Draw, BettingCondition, Bet } from '../../types';
+import BettingForm from './BettingForm';
+import ComboForm from './KainchiForm';
+import PositionalBettingForm from './PositionalBettingForm';
 
 const BettingInterface: React.FC = () => {
     const { draws, placeBulkBetsForCurrentClient } = useAppContext();
