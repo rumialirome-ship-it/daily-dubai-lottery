@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import BetResult from './BetResult.tsx';
-import { GameType } from '../../types/index.ts';
-import { getGameTypeDisplayName } from '../../utils/helpers.ts';
+import { useAppContext } from '../../contexts/AppContext';
+import BetResult from './BetResult';
+import { GameType } from '../../types';
+import { getGameTypeDisplayName } from '../../utils/helpers';
 
 const BetHistory: React.FC = () => {
     const { currentClient, bets, draws } = useAppContext();
