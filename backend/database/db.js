@@ -1,4 +1,4 @@
-const mysql = require('mysql2/promise');
+const mysql = require('mysql2');
 require('dotenv').config();
 
 const pool = mysql.createPool({
@@ -11,13 +11,8 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-pool.getConnection()
-    .then(conn => {
-        console.log('Connected to the MySQL database.');
-        conn.release();
-    })
-    .catch(err => {
-        console.error('Error connecting to MySQL database:', err.message);
-        // Exit process if cannot connect to DB
-        process.exit(1);
-    });
+// By exporting pool.promise(), we get a promise-wrapped version of the pool
+// which is what all the controllers and services expect. This is a more
+// robust way of ensuring promise support than `require('mysql2/promise')`
+// and resolves the TypeError on getConnection.
+module.exports = pool.promise();
