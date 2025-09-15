@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Draw, Bet, Client, SmartAnalysisReport } from '../types/index.ts';
-import { isBetWinner } from '../utils/helpers.ts';
+import { Draw, Bet, Client, SmartAnalysisReport } from '../types';
+import { isBetWinner } from '../utils/helpers';
 
 const API_KEY = process.env.API_KEY;
 let ai: GoogleGenAI | null = null;
