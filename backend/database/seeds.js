@@ -1,10 +1,10 @@
+const path = require('path');
 // Load environment variables from backend/.env
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+require('dotenv').config({ path: path.join(process.cwd(), 'backend', '.env') });
 
 const bcrypt = require('bcryptjs');
-const path = require('path');
 const dbPool = require('./db'); // This is the mysql2 pool
-const { defaultPrizeRates, defaultCommissionRates } = require(path.join(__dirname, '..', 'data', 'defaultRates.js'));
+const { defaultPrizeRates, defaultCommissionRates } = require(path.join(process.cwd(), 'backend', 'data', 'defaultRates.js'));
 
 async function seedDatabase() {
     console.log('Starting database seed...');
