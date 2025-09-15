@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { Role } from '../types/index.ts';
-import Header from '../components/common/Header.tsx';
-import MarketStatus from '../components/common/MarketStatus.tsx';
-import AdminDashboard from '../components/admin/AdminDashboard.tsx';
-import ClientDashboard from '../components/client/ClientDashboard.tsx';
-import MarketTimings from '../components/common/MarketTimings.tsx';
-import CurrentDateDisplay from '../components/common/CurrentDateDisplay.tsx';
-import PrizeEligibility from '../components/common/PrizeEligibility.tsx';
+import { useAppContext } from '../contexts/AppContext';
+import { Role } from '../types';
+import Header from '../components/common/Header';
+import MarketStatus from '../components/common/MarketStatus';
+import AdminDashboard from '../components/admin/AdminDashboard';
+import ClientDashboard from '../components/client/ClientDashboard';
+import MarketTimings from '../components/common/MarketTimings';
+import CurrentDateDisplay from '../components/common/CurrentDateDisplay';
+import PrizeEligibility from '../components/common/PrizeEligibility';
 
 const Dashboard: React.FC = () => {
     const { currentClient, logout } = useAppContext();
