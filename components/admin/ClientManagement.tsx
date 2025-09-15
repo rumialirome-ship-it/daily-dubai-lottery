@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import { Client, Role, GameType, PrizeRate, Draw, DrawStatus, TransactionType } from '../../types/index.ts';
-import Modal from '../common/Modal.tsx';
-import PasswordInput from '../common/PasswordInput.tsx';
-import ClientDrawReport from './ClientDrawReport.tsx';
-import FinancialLedger from '../common/FinancialLedger.tsx';
-import { defaultPrizeRates } from '../../data/mockData.ts';
+import { useAppContext } from '../../contexts/AppContext';
+import { Client, Role, GameType, PrizeRate, Draw, DrawStatus, TransactionType } from '../../types';
+import Modal from '../common/Modal';
+import PasswordInput from '../common/PasswordInput';
+import ClientDrawReport from './ClientDrawReport';
+import FinancialLedger from '../common/FinancialLedger';
+import { defaultPrizeRates } from '../../data/mockData';
 
 
 type ModalType = 'ADD_CLIENT' | 'MANAGE_WALLET' | 'CHANGE_PASSWORD' | 'EDIT_CLIENT' | 'EDIT_RATES' | 'CLIENT_DRAW_REPORT' | 'FINANCIAL_LEDGER';
@@ -472,7 +472,7 @@ const ClientManagement = () => {
     return (
         <div>
             {notification && (
-                <div className={`fixed top-28 right-8 z-50 p-4 rounded-lg shadow-lg text-sm text-center ${notification.type === 'success' ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-red-900/50 text-red-300 border border-red-700'}`}>
+                <div className={`fixed top-28 right-8 z-50 p-4 rounded-lg shadow-lg text-sm text-center ${notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
                     {notification.message}
                 </div>
             )}
