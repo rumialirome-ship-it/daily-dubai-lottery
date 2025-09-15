@@ -1,4 +1,5 @@
-const { defaultPrizeRates, defaultCommissionRates } = require('../data/defaultRates');
+const path = require('path');
+const { defaultPrizeRates, defaultCommissionRates } = require(path.join(__dirname, '..', 'data', 'defaultRates.js'));
 
 const normalizeClientData = (client) => {
     if (!client) return null;
