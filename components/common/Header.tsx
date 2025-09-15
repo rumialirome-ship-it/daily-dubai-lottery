@@ -1,7 +1,7 @@
 import React from 'react';
 // FIX: The named imports for Link and NavLink were failing. Using a namespace import as a workaround for a potential build tool or module resolution issue.
 import * as ReactRouterDom from 'react-router-dom';
-import { Client, Role } from '../../types/index.ts';
+import { Client, Role } from '../../types';
 
 const Logo = () => (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
