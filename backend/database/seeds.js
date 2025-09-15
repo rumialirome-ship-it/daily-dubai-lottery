@@ -2,8 +2,9 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 const bcrypt = require('bcryptjs');
+const path = require('path');
 const dbPool = require('./db'); // This is the mysql2 pool
-const { defaultPrizeRates, defaultCommissionRates } = require('../data/defaultRates');
+const { defaultPrizeRates, defaultCommissionRates } = require(path.join(__dirname, '..', 'data', 'defaultRates.js'));
 
 async function seedDatabase() {
     console.log('Starting database seed...');
