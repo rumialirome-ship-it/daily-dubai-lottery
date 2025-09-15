@@ -1,5 +1,7 @@
 
-import { ParsedBet, GameType, BettingCondition } from '../types/index.ts';
+
+
+import { ParsedBet, GameType, BettingCondition } from '../types';
 
 function getGameTypeForNumber(numStr: string): GameType | null {
     const upperCaseNum = numStr.toUpperCase();
