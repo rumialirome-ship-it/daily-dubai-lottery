@@ -1,7 +1,11 @@
 
 
+
+
+
 import React, { useEffect, useCallback } from 'react';
-import { HashRouter } from 'react-router-dom';
+// FIX: The named import for HashRouter was failing. Using a namespace import as a workaround for a potential build tool or module resolution issue.
+import * as ReactRouterDom from 'react-router-dom';
 import { AppProvider, useAppContext } from './contexts/AppContext.tsx';
 import AppRoutes from './routes/AppRoutes.tsx';
 import { Role } from './types/index.ts';
@@ -61,13 +65,25 @@ const InactivityManager: React.FC = () => {
 };
 
 
-const App = () => (
-    <AppProvider>
-        <HashRouter>
-            <InactivityManager />
-            <AppRoutes />
-        </HashRouter>
-    </AppProvider>
-);
+const App = () => {
+    useEffect(() => {
+        // This effect runs once after the initial render.
+        // It makes the root element visible, preventing the flash of unstyled content (FOUC).
+        const rootEl = document.getElementById('root');
+        if (rootEl) {
+            // The initial opacity is set to 0 via a style tag in index.html
+            rootEl.style.opacity = '1';
+        }
+    }, []);
+    
+    return (
+        <AppProvider>
+            <ReactRouterDom.HashRouter>
+                <InactivityManager />
+                <AppRoutes />
+            </ReactRouterDom.HashRouter>
+        </AppProvider>
+    );
+};
 
 export default App;
