@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "db:init": "echo \"Database initialization is now handled by your MySQL server.\""
+    "db:init": "echo \"Database initialization is now handled by your MySQL server.\"",
+    "db:seed": "node ./database/seed.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
