@@ -18,7 +18,7 @@ const getClientData = async (req, res) => {
 
 const getClientBets = async (req, res) => {
     try {
-        const [rows] = await db.execute("SELECT * FROM bets WHERE clientId = ? ORDER BY createdAt DESC", [req.user.id]);
+        const [rows] = await db.execute("SELECT *, bettingCondition as `condition` FROM bets WHERE clientId = ? ORDER BY createdAt DESC", [req.user.id]);
         res.json(rows);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -70,7 +70,7 @@ const placeBets = async (req, res) => {
         await connection.execute("INSERT INTO transactions (id, clientId, type, amount, description, balanceAfter, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", Object.values(newTransaction));
         
         if (betsToPlace.length > 0) {
-            const betInsertSql = "INSERT INTO bets (id, clientId, drawId, gameType, number, stake, createdAt, condition, positions) VALUES ?";
+            const betInsertSql = "INSERT INTO bets (id, clientId, drawId, gameType, number, stake, createdAt, bettingCondition, positions) VALUES ?";
             const betValues = betsToPlace.map(bet => [
                 `bet-${generateUniqueId()}`, clientId, bet.drawId, bet.gameType, bet.number, bet.stake, new Date(), bet.condition, JSON.stringify(bet.positions || null)
             ]);
