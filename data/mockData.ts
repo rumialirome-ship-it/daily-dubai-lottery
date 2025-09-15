@@ -1,4 +1,4 @@
-import { GameType } from '../types/index.ts';
+import { GameType } from '../types';
 
 export const defaultPrizeRates: Record<GameType, { first: number, second: number }> = {
     [GameType.FourDigits]: { first: 525000, second: 165000 },
