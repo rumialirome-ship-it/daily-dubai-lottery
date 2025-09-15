@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// FIX: The named import for useNavigate was failing. Using a namespace import as a workaround for a potential build tool or module resolution issue.
+import * as ReactRouterDom from 'react-router-dom';
 import { useAppContext } from '../../contexts/AppContext.tsx';
 import { Role } from '../../types/index.ts';
 import LockIcon from '../common/LockIcon.tsx';
@@ -17,7 +18,7 @@ const Login: React.FC = () => {
     const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
     const { login } = useAppContext();
-    const navigate = useNavigate();
+    const navigate = ReactRouterDom.useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
