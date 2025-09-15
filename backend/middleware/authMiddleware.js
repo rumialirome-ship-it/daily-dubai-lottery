@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
-const path = require('path');
-const db = require(path.join(__dirname, '..', 'database', 'db'));
+const db = require('../database/db');
 
 const protect = async (req, res, next) => {
     let token;
@@ -9,18 +8,25 @@ const protect = async (req, res, next) => {
             token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             
-            const [rows] = await db.query('SELECT id, username, role FROM clients WHERE id = ?', [decoded.id]);
-            const client = rows[0];
-            
-            if (!client) {
-                return res.status(401).json({ message: 'Not authorized, client not found' });
+            // First, try to find the user in the clients table.
+            const [clientRows] = await db.execute('SELECT id, username, role FROM clients WHERE id = ?', [decoded.id]);
+            let user = clientRows[0];
+
+            // If not found, try the admin users table.
+            if (!user) {
+                const [adminRows] = await db.execute('SELECT id, username, role FROM users WHERE id = ?', [decoded.id]);
+                user = adminRows[0];
+            }
+
+            if (!user) {
+                return res.status(401).json({ message: 'Not authorized, user not found' });
             }
             
-            req.client = client;
+            req.user = user;
             next();
 
         } catch (error) {
-            console.error(error);
+            console.error("Auth middleware error:", error);
             res.status(401).json({ message: 'Not authorized, token failed' });
         }
     }
@@ -31,7 +37,7 @@ const protect = async (req, res, next) => {
 };
 
 const admin = (req, res, next) => {
-    if (req.client && req.client.role === 'ADMIN') {
+    if (req.user && req.user.role === 'ADMIN') {
         next();
     } else {
         res.status(401).json({ message: 'Not authorized as an admin' });
