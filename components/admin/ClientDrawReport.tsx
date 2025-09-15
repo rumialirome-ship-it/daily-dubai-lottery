@@ -1,9 +1,9 @@
 
 
 import React, { useMemo } from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import { Client, Draw, Bet, GameType, BettingCondition } from '../../types/index.ts';
-import { isBetWinner } from '../../utils/helpers.ts';
+import { useAppContext } from '../../contexts/AppContext';
+import { Client, Draw, Bet, GameType, BettingCondition } from '../../types';
+import { isBetWinner } from '../../utils/helpers';
 
 interface ReportData {
     booked: string[];
