@@ -1,325 +1,332 @@
-import React, { useState, useEffect } from 'react';
+
+
+import React, { useState } from 'react';
 import { useAppContext } from '../../contexts/AppContext';
-import { Draw, DrawStatus, MarketOverride } from '../../types';
-import Modal from '../common/Modal';
-import DrawReport from './DrawReport';
-import LiveBettingReport from './LiveBettingReport';
+import { Client, Role, ClientImportData, GameType } from '../../types';
 
-const DrawManagement = () => {
-    const { draws, declareWinner, toggleDrawStatus, marketOverride, setMarketOverride, updateDrawTime, shiftAllDrawTimes } = useAppContext();
-    const [winningNumbers, setWinningNumbers] = useState<{ [key: string]: string[] }>({});
-    const [selectedReportDraw, setSelectedReportDraw] = useState<Draw | null>(null);
-    const [selectedLiveReportDraw, setSelectedLiveReportDraw] = useState<Draw | null>(null);
-    const [timeModalState, setTimeModalState] = useState<{ type: 'single', draw: Draw } | { type: 'all' } | null>(null);
-    const [newTimeValue, setNewTimeValue] = useState('');
-    const [shiftMinutes, setShiftMinutes] = useState(0);
-    const [editingDrawId, setEditingDrawId] = useState<string | null>(null);
+const DATA_KEYS = ['ddl_clients', 'ddl_draws', 'ddl_bets', 'ddl_transactions', 'ddl_marketOverride'];
 
+const DataManagement = () => {
+    const { clients, importClientsFromCSV } = useAppContext();
+    const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [isRestoring, setIsRestoring] = useState(false);
+    const [restoreFile, setRestoreFile] = useState<File | null>(null);
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
 
-    useEffect(() => {
-        // This effect robustly initializes state for each draw's inputs without wiping out admin input.
-        // It uses a functional update and a hasOwnProperty check to ensure stability during re-renders.
-        setWinningNumbers(currentNumbers => {
-            const newNumbersState = { ...currentNumbers };
-            let hasChanged = false;
-            for (const draw of draws) {
-                // Only initialize state for a draw if it doesn't already exist.
-                if (!Object.prototype.hasOwnProperty.call(newNumbersState, draw.id)) {
-                    newNumbersState[draw.id] = ['', '', '', ''];
-                    hasChanged = true;
+    const showNotification = (type: 'success' | 'error', message: string) => {
+        setNotification({ type, message });
+        setTimeout(() => setNotification(null), 5000);
+    };
+
+    const handleBackup = () => {
+        try {
+            const backupData: Record<string, any> = {};
+            DATA_KEYS.forEach(key => {
+                const data = localStorage.getItem(key);
+                if (data) {
+                    // We parse and stringify again to get a clean JSON format
+                    backupData[key] = JSON.parse(data);
                 }
-            }
-            // Return the original state object if no changes were made to prevent unnecessary re-renders.
-            return hasChanged ? newNumbersState : currentNumbers;
-        });
-    }, [draws]);
+            });
 
-    const handleDeclareOrUpdateWinner = (drawId: string) => {
-        const numbersForThisDraw = winningNumbers[drawId];
+            const jsonString = JSON.stringify(backupData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const date = new Date().toISOString().split('T')[0];
+            link.download = `ddl-full-data-backup-${date}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showNotification('success', 'Full data backup downloaded successfully!');
+        } catch (error) {
+            console.error('Backup failed:', error);
+            showNotification('error', 'An error occurred during data backup.');
+        }
+    };
 
-        // Explicitly check that we have an array of 4 elements.
-        if (!Array.isArray(numbersForThisDraw) || numbersForThisDraw.length !== 4) {
-            alert('Internal Error: Winning number data is missing or corrupt. Please refresh and try again.');
+    const handleExportClientsCSV = () => {
+        const clientsToExport = clients.filter(c => c.role === Role.Client);
+        if (clientsToExport.length === 0) {
+            showNotification('error', 'No client data to export.');
             return;
         }
 
-        const invalidFieldIndices: string[] = [];
+        try {
+            const headers = ['Client ID', 'Username', 'Contact', 'Area', 'Wallet Balance', 'Status', 'Commission Rate (%)'];
+            const clientRows = clientsToExport.map(client => [
+                client.clientId,
+                client.username,
+                client.contact || '',
+                client.area || '',
+                client.wallet.toFixed(2),
+                client.isActive ? 'Active' : 'Suspended',
+                client.commissionRates?.[GameType.FourDigits] || 0
+            ]);
 
-        // Validate each of the four numbers individually.
-        for (let i = 0; i < 4; i++) {
-            const singleNumber = numbersForThisDraw[i];
+            const escapeCsvField = (field: any): string => {
+                const stringField = String(field);
+                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                    return `"${stringField.replace(/"/g, '""')}"`;
+                }
+                return stringField;
+            };
             
-            // Check if the entry is a string and if it consists of exactly 4 digits.
-            const isFourDigitNumber = typeof singleNumber === 'string' && /^\d{4}$/.test(singleNumber);
-            
-            if (!isFourDigitNumber) {
-                invalidFieldIndices.push(`#${i + 1}`);
-            }
+            const csvContent = [
+                headers.join(','),
+                ...clientRows.map(row => row.map(escapeCsvField).join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const date = new Date().toISOString().split('T')[0];
+            link.download = `ddl-client-data-${date}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showNotification('success', 'Client data CSV downloaded successfully!');
+        } catch (error) {
+            console.error('Client data export failed:', error);
+            showNotification('error', 'An error occurred during client data export.');
         }
+    };
 
-        // If any validation failed, construct a detailed error message.
-        if (invalidFieldIndices.length > 0) {
-            const errorMessage = `Error: All four winning number fields must be filled with a 4-digit number. Problematic field(s): ${invalidFieldIndices.join(', ')}`;
-            alert(errorMessage);
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            setRestoreFile(e.target.files[0]);
+        }
+    };
+
+    const handleRestore = () => {
+        if (!restoreFile) {
+            showNotification('error', 'Please select a data backup file to restore.');
             return;
         }
 
-        // If all checks passed, proceed with declaring the winner.
-        declareWinner(drawId, numbersForThisDraw);
-        setEditingDrawId(null); // Exit editing mode after submission
-    };
-    
-    const handleNumberChange = (drawId: string, value: string, index: number) => {
-        const currentNumbers = [...(winningNumbers[drawId] || ['', '', '', ''])];
-        currentNumbers[index] = value.replace(/[^0-9]/g, '').slice(0, 4);
-        setWinningNumbers(prev => ({ ...prev, [drawId]: currentNumbers }));
-    };
-
-    const handleStartEdit = (draw: Draw) => {
-        setEditingDrawId(draw.id);
-        setWinningNumbers(prev => ({ ...prev, [draw.id]: [...(draw.winningNumbers || ['', '', '', ''])] }));
-    };
-    
-    const handleCancelEdit = () => {
-        setEditingDrawId(null);
-    };
-
-    const getStatusColor = (status: DrawStatus) => {
-        switch (status) {
-            case DrawStatus.Open: return 'text-green-400';
-            case DrawStatus.Closed: return 'text-yellow-400';
-            case DrawStatus.Finished: return 'text-blue-400';
-            case DrawStatus.Upcoming: return 'text-gray-400';
-            case DrawStatus.Suspended: return 'text-gray-500';
-        }
-    };
-
-    const handleViewReport = (draw: Draw) => {
-        if(draw.status === DrawStatus.Finished) {
-            setSelectedReportDraw(draw);
-        }
-    };
-
-    const handleViewLiveReport = (e: React.MouseEvent, draw: Draw) => {
-        e.stopPropagation();
-        if (draw.status === DrawStatus.Open || draw.status === DrawStatus.Closed) {
-            setSelectedLiveReportDraw(draw);
-        }
-    };
-
-    const handleOpenTimeModal = (type: 'all' | 'single', draw?: Draw) => {
-        if (type === 'single' && draw) {
-            const timeString = draw.drawTime.toTimeString().substring(0, 5); // HH:mm format
-            setNewTimeValue(timeString);
-            setTimeModalState({ type: 'single', draw });
-        } else if (type === 'all') {
-            setShiftMinutes(0);
-            setTimeModalState({ type: 'all' });
-        }
-    };
-    
-    const handleUpdateTime = () => {
-        if (timeModalState?.type === 'single' && newTimeValue) {
-            const draw = timeModalState.draw;
-            const [hours, minutes] = newTimeValue.split(':').map(Number);
-            const newDate = new Date(draw.drawTime);
-            newDate.setHours(hours, minutes, 0, 0);
-            updateDrawTime(draw.id, newDate);
-            setTimeModalState(null);
-        }
-    };
-
-    const handleShiftAllDraws = () => {
-        if (timeModalState?.type === 'all' && shiftMinutes !== 0) {
-            shiftAllDrawTimes(shiftMinutes);
-            setTimeModalState(null);
-        }
-    };
-
-
-    const MarketControlButton = ({ mode, label }: { mode: MarketOverride, label: string }) => {
-        const isActive = marketOverride === mode;
-        const baseClasses = "font-bold py-2 px-4 rounded-lg transition-colors flex-1";
-        const activeClasses = "bg-brand-primary text-brand-bg shadow-lg";
-        const inactiveClasses = "bg-brand-secondary hover:bg-opacity-80 text-brand-text-secondary";
-
-        return (
-            <button onClick={() => setMarketOverride(mode)} className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses}`}>
-                {label}
-            </button>
+        const confirmation = window.confirm(
+            'WARNING: This will overwrite all existing application data with the content of the backup file. This action cannot be undone. Are you sure you want to proceed?'
         );
+
+        if (!confirmation) {
+            return;
+        }
+
+        setIsRestoring(true);
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                const text = e.target?.result;
+                if (typeof text !== 'string') {
+                    throw new Error('Failed to read file.');
+                }
+                const backupData = JSON.parse(text);
+
+                const backupKeys = Object.keys(backupData);
+                const hasAllKeys = DATA_KEYS.every(key => backupKeys.includes(key));
+                
+                if (!hasAllKeys) {
+                     throw new Error('Invalid backup file. It is missing some required data keys.');
+                }
+                
+                backupKeys.forEach(key => {
+                    if (DATA_KEYS.includes(key)) {
+                        localStorage.setItem(key, JSON.stringify(backupData[key]));
+                    }
+                });
+                
+                showNotification('success', 'Restore successful! The application will now reload.');
+
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+
+            } catch (error: any) {
+                console.error('Restore failed:', error);
+                showNotification('error', `Restore failed: ${error.message || 'Invalid JSON format.'}`);
+                setIsRestoring(false);
+            }
+        };
+        
+        reader.onerror = () => {
+             showNotification('error', 'Failed to read the selected file.');
+             setIsRestoring(false);
+        };
+        
+        reader.readAsText(restoreFile);
     };
-    
-    const getMarketStatusDescription = () => {
-        switch(marketOverride) {
-            case 'OPEN': return { text: 'Market is Manually OPEN', color: 'text-green-400' };
-            case 'CLOSED': return { text: 'Market is Manually CLOSED', color: 'text-red-400' };
-            default: return { text: 'Market is running on Automatic schedule', color: 'text-blue-400' };
-        }
-    }
 
-    const marketStatusInfo = getMarketStatusDescription();
+    const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            setImportFile(e.target.files[0]);
+        } else {
+            setImportFile(null);
+        }
+    };
 
-    const renderTimeModalContent = () => {
-        if (!timeModalState) return null;
-    
-        if (timeModalState.type === 'single') {
-            return (
-                <div className="space-y-4">
-                    <p className="text-brand-text-secondary">Current draw time: {timeModalState.draw.drawTime.toLocaleTimeString()}</p>
-                    <div>
-                        <label className="block text-brand-text-secondary text-sm font-bold mb-2" htmlFor="newTime">New Draw Time</label>
-                        <input id="newTime" type="time" value={newTimeValue} onChange={e => setNewTimeValue(e.target.value)} className="w-full bg-brand-bg border border-brand-secondary rounded-lg py-2 px-3 text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary" />
-                    </div>
-                    <button onClick={handleUpdateTime} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save Time</button>
-                </div>
-            );
+    const handleImport = () => {
+        if (!importFile) {
+            showNotification('error', 'Please select a CSV file to import.');
+            return;
         }
-    
-        if (timeModalState.type === 'all') {
-            return (
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-brand-text-secondary text-sm font-bold mb-2" htmlFor="shiftMinutes">Shift all non-finished draws by (minutes)</label>
-                        <input id="shiftMinutes" type="number" step="5" value={shiftMinutes} onChange={e => setShiftMinutes(Number(e.target.value))} className="w-full bg-brand-bg border border-brand-secondary rounded-lg py-2 px-3 text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary" placeholder="e.g., 30 or -15"/>
-                         <p className="text-xs text-brand-text-secondary mt-1">Use a positive number to delay draws, negative to advance them.</p>
-                    </div>
-                    <button onClick={handleShiftAllDraws} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Confirm Shift</button>
-                </div>
-            );
-        }
-        return null;
+        setIsImporting(true);
+        const reader = new FileReader();
+
+        reader.onload = async (e) => {
+            try {
+                const text = e.target?.result as string;
+                const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+                if (lines.length < 1) throw new Error("CSV file is empty.");
+
+                const header = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                const expectedHeader = ['Client ID', 'Username', 'Password', 'Contact', 'Area', 'Initial Deposit', 'Commission Rate (%)'];
+                
+                if (header.length !== expectedHeader.length || !header.every((h, i) => h === expectedHeader[i])) {
+                    throw new Error(`Invalid CSV header. Expected: ${expectedHeader.join(', ')}`);
+                }
+                
+                const clientsData: ClientImportData[] = lines.slice(1).map((line, index) => {
+                    const values = line.split(',');
+                    if (values.length !== expectedHeader.length) {
+                        throw new Error(`Row ${index + 2}: has incorrect number of columns. Expected ${expectedHeader.length}, got ${values.length}.`);
+                    }
+                    return {
+                        'Client ID': values[0]?.trim(),
+                        'Username': values[1]?.trim(),
+                        'Password': values[2]?.trim(),
+                        'Contact': values[3]?.trim(),
+                        'Area': values[4]?.trim(),
+                        'Initial Deposit': parseFloat(values[5]?.trim()) || 0,
+                        'Commission Rate (%)': parseFloat(values[6]?.trim()) || 0,
+                    };
+                });
+                
+                if (clientsData.length === 0) throw new Error("No data rows found in the CSV file.");
+
+                const result = await importClientsFromCSV(clientsData);
+
+                let summaryMessage = `Import finished. ${result.successCount} clients imported successfully.`;
+                if(result.errorCount > 0) {
+                    summaryMessage += `\n${result.errorCount} clients failed due to errors.`;
+                    console.error("Import Errors:\n" + result.errorMessages.join('\n'));
+                    showNotification('error', `${summaryMessage} See browser console for details.`);
+                } else {
+                    showNotification('success', summaryMessage);
+                }
+
+            } catch(error: any) {
+                showNotification('error', `Import failed: ${error.message}`);
+            } finally {
+                setIsImporting(false);
+                setImportFile(null);
+                const fileInput = document.getElementById('import-file-input') as HTMLInputElement;
+                if(fileInput) fileInput.value = '';
+            }
+        };
+        reader.onerror = () => {
+            showNotification('error', 'Failed to read the file.');
+            setIsImporting(false);
+        };
+        reader.readAsText(importFile);
     };
 
 
     return (
-        <div>
-            <h2 className="text-2xl font-bold text-brand-text mb-4">Draw Management</h2>
-            
-            <div className="bg-brand-surface p-4 rounded-lg border border-brand-secondary mb-6">
-                <h3 className="text-lg font-bold text-brand-text mb-2">Market & Time Control</h3>
-                <p className={`text-sm mb-4 font-semibold ${marketStatusInfo.color}`}>{marketStatusInfo.text}</p>
-                <div className="flex flex-col md:flex-row gap-2">
-                    <MarketControlButton mode="AUTO" label="Set to Automatic" />
-                    <MarketControlButton mode="OPEN" label="Force Open Market" />
-                    <MarketControlButton mode="CLOSED" label="Force Close Market" />
+        <div className="space-y-8">
+             <h2 className="text-2xl font-bold text-brand-text">Data Management</h2>
+
+            {notification && (
+                <div className={`p-4 rounded-lg text-sm text-center ${notification.type === 'success' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}`}>
+                    {notification.message}
                 </div>
-                 <div className="mt-4 border-t border-brand-secondary pt-4">
-                    <button onClick={() => handleOpenTimeModal('all')} className="w-full bg-brand-accent hover:bg-sky-400 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                        Adjust All Draw Times
+            )}
+
+            <div className="bg-brand-surface p-6 rounded-lg border border-brand-secondary">
+                <h3 className="text-xl font-bold text-brand-text mb-2">Export Client Data (CSV)</h3>
+                <p className="text-brand-text-secondary mb-4">
+                    Download a CSV file containing a list of all clients and their key information, such as contact details, wallet balance, and commission rate. This is useful for offline analysis or record-keeping.
+                </p>
+                <button 
+                    onClick={handleExportClientsCSV} 
+                    className="w-full md:w-auto bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                    Download Client Info (.csv)
+                </button>
+            </div>
+            
+             <div className="bg-brand-surface p-6 rounded-lg border border-brand-secondary">
+                <h3 className="text-xl font-bold text-brand-text mb-2">Import Client Data (CSV)</h3>
+                <p className="text-brand-text-secondary mb-4">
+                    Upload a CSV file to bulk-create new client accounts. The file must have a header row and data in the following format. Ensure Client ID, Username, and Contact are unique.
+                </p>
+                <code className="block bg-brand-bg p-2 rounded-md text-brand-text-secondary text-sm mb-4 font-mono">
+                    Client ID,Username,Password,Contact,Area,Initial Deposit,Commission Rate (%)
+                </code>
+                <div className="flex flex-col md:flex-row gap-4 items-center">
+                    <input 
+                        id="import-file-input"
+                        type="file"
+                        accept=".csv"
+                        onChange={handleImportFileChange}
+                        className="flex-grow w-full text-sm text-brand-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-brand-bg hover:file:bg-yellow-400"
+                    />
+                    <button
+                        onClick={handleImport}
+                        disabled={!importFile || isImporting}
+                        className="w-full md:w-auto bg-teal-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-teal-700 transition-colors disabled:bg-brand-secondary disabled:cursor-not-allowed"
+                    >
+                        {isImporting ? 'Importing...' : 'Import from CSV'}
                     </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {draws.map(draw => {
-                    const isEditing = editingDrawId === draw.id;
-                    const cardClasses = isEditing 
-                        ? 'border-brand-primary shadow-glow' 
-                        : 'hover:border-brand-primary/80';
-                    const cursorClass = !isEditing && draw.status === DrawStatus.Finished 
-                        ? 'cursor-pointer'
-                        : '';
-                        
-                    return (
-                        <div
-                            key={draw.id}
-                            className={`bg-brand-surface rounded-lg shadow p-4 border border-brand-secondary transition-all duration-300 ${cardClasses} ${cursorClass}`}
-                            onClick={() => !isEditing && handleViewReport(draw)}
-                        >
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h3 className="font-bold text-brand-text">Draw {draw.name}</h3>
-                                    <p className={`text-sm font-semibold ${getStatusColor(draw.status)}`}>
-                                        {draw.status}
-                                        {isEditing && <span className="text-yellow-400"> (Editing)</span>}
-                                        {draw.status === DrawStatus.Suspended && <span className="text-xs"> (Paused)</span>}
-                                    </p>
-                                </div>
-                                <span className="text-xs text-brand-text-secondary">{draw.drawTime.toLocaleTimeString()}</span>
-                            </div>
-                            {draw.status === DrawStatus.Finished && !isEditing ? (
-                                <div className="mt-4">
-                                    <p className="text-brand-text-secondary">Winning Numbers:</p>
-                                    <p className="text-xl font-bold text-brand-primary">{draw.winningNumbers?.join(', ')}</p>
-                                    <div className="flex justify-between items-center mt-2">
-                                        <p className="text-xs text-brand-text-secondary mt-2">Click card to view report</p>
-                                        <button onClick={(e) => { e.stopPropagation(); handleStartEdit(draw); }} className="bg-brand-accent text-white font-bold py-1 px-3 rounded-md hover:bg-sky-400 text-sm transition-colors">
-                                            Edit
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="mt-4 space-y-2">
-                                    {(winningNumbers[draw.id] || ['', '', '', '']).map((num, index) => (
-                                        <input
-                                            key={index}
-                                            type="text"
-                                            maxLength={4}
-                                            placeholder={`Winner #${index + 1}`}
-                                            value={num}
-                                            onChange={(e) => handleNumberChange(draw.id, e.target.value, index)}
-                                            className="w-full bg-brand-bg border border-brand-secondary rounded-md py-2 px-3 text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                                            disabled={draw.status !== DrawStatus.Closed && !isEditing}
-                                        />
-                                    ))}
-                                    <div className="flex gap-2 items-center flex-wrap">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDeclareOrUpdateWinner(draw.id); }}
-                                            disabled={draw.status !== DrawStatus.Closed && !isEditing}
-                                            className="mt-2 flex-grow bg-brand-primary text-brand-bg font-bold py-2 px-4 rounded-md disabled:bg-brand-secondary disabled:cursor-not-allowed hover:bg-yellow-400 transition-colors"
-                                        >
-                                            {isEditing ? 'Update Winners' : 'Declare'}
-                                        </button>
-                                        {isEditing && (
-                                            <button onClick={(e) => { e.stopPropagation(); handleCancelEdit(); }} className="mt-2 bg-gray-500 text-white p-2 rounded-md hover:bg-gray-600 transition-colors" title="Cancel Edit">
-                                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/></svg>
-                                            </button>
-                                        )}
-                                        <button onClick={(e) => { e.stopPropagation(); handleOpenTimeModal('single', draw); }} className="mt-2 bg-purple-600 text-white p-2 rounded-md hover:bg-purple-700 transition-colors disabled:bg-brand-secondary disabled:cursor-not-allowed" title="Edit Draw Time" disabled={draw.status === DrawStatus.Suspended || isEditing}>
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>
-                                        </button>
-                                        {(draw.status === DrawStatus.Open || draw.status === DrawStatus.Closed) && (
-                                            <button onClick={(e) => handleViewLiveReport(e, draw)} className="mt-2 bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition-colors" title="View Live Trend Report">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H1v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h1V7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7h1V2z"/></svg>
-                                            </button>
-                                        )}
-                                        {draw.status !== DrawStatus.Suspended ? (
-                                            <button onClick={(e) => { e.stopPropagation(); toggleDrawStatus(draw.id); }} className="mt-2 bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition-colors disabled:bg-brand-secondary disabled:cursor-not-allowed" title="Suspend Draw" disabled={isEditing}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>
-                                            </button>
-                                        ) : (
-                                            <button onClick={(e) => { e.stopPropagation(); toggleDrawStatus(draw.id); }} className="mt-2 bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition-colors" title="Activate Draw" disabled={isEditing}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )
-                })}
-            </div>
-             {selectedReportDraw && (
-                <Modal title={`Report for Draw ${selectedReportDraw.name}`} onClose={() => setSelectedReportDraw(null)}>
-                    <DrawReport draw={selectedReportDraw} />
-                </Modal>
-            )}
-             {selectedLiveReportDraw && (
-                <Modal title={`Live Trend Report for Draw ${selectedLiveReportDraw.name}`} onClose={() => setSelectedLiveReportDraw(null)}>
-                    <LiveBettingReport draw={selectedLiveReportDraw} />
-                </Modal>
-            )}
-             {timeModalState && (
-                <Modal 
-                    title={timeModalState.type === 'single' ? `Edit Time for Draw ${timeModalState.draw.name}` : "Shift All Draw Times"} 
-                    onClose={() => setTimeModalState(null)}
+            <div className="bg-brand-surface p-6 rounded-lg border border-brand-secondary">
+                <h3 className="text-xl font-bold text-brand-text mb-2">Create Full Data Backup</h3>
+                <p className="text-brand-text-secondary mb-4">
+                    This application runs in your browser and does not need to be downloaded to your PC.
+                    <br/>
+                    This button will save a <strong className="text-brand-text">JSON data file</strong> to your computer. This file contains all client accounts, betting history, and financial transactions. Keep it in a safe place.
+                </p>
+                <button 
+                    onClick={handleBackup} 
+                    className="w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                    {renderTimeModalContent()}
-                </Modal>
-            )}
+                    Download Full Data File (.json)
+                </button>
+            </div>
+
+            <div className="bg-brand-surface p-6 rounded-lg border border-red-500/50">
+                 <h3 className="text-xl font-bold text-red-400 mb-2">Restore from Data File</h3>
+                 <p className="text-brand-text-secondary mb-4">
+                    Upload a `.json` data file to restore all clients, bets, and transactions.
+                 </p>
+                 <div className="bg-red-900/30 border border-red-500/50 p-3 rounded-lg text-red-300 text-sm mb-4">
+                    <strong>Warning:</strong> Restoring will completely overwrite all current data in your browser's storage. This action is irreversible.
+                 </div>
+                 <div className="flex flex-col md:flex-row gap-4 items-center">
+                    <input 
+                        type="file"
+                        accept=".json"
+                        onChange={handleFileChange}
+                        className="flex-grow w-full text-sm text-brand-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-brand-bg hover:file:bg-yellow-400"
+                    />
+                    <button
+                        onClick={handleRestore}
+                        disabled={!restoreFile || isRestoring}
+                        className="w-full md:w-auto bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition-colors disabled:bg-brand-secondary disabled:cursor-not-allowed"
+                    >
+                        {isRestoring ? 'Restoring...' : 'Restore Data'}
+                    </button>
+                 </div>
+            </div>
         </div>
     );
 };
 
-export default DrawManagement;
+export default DataManagement;
