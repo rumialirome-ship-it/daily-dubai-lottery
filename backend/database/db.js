@@ -1,8 +1,11 @@
 const mysql = require('mysql2');
 require('dotenv').config();
 
+// Resolve DB host, forcing 'localhost' to '127.0.0.1' to prevent IPv6 issues.
+const dbHost = process.env.DB_HOST === 'localhost' ? '127.0.0.1' : process.env.DB_HOST;
+
 const pool = mysql.createPool({
-    host: process.env.DB_HOST || '127.0.0.1',
+    host: dbHost || '127.0.0.1',
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE,
