@@ -1,7 +1,6 @@
-
 import React from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import FinancialLedger from '../common/FinancialLedger.tsx';
+import { useAppContext } from '../../contexts/AppContext';
+import FinancialLedger from '../common/FinancialLedger';
 
 const FinancialStatement: React.FC = () => {
     const { currentClient } = useAppContext();
