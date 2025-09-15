@@ -1,50 +1,85 @@
-import React from 'react';
-// FIX: The named import for Link was failing. Using a namespace import as a workaround for a potential build tool or module resolution issue.
-import * as ReactRouterDom from 'react-router-dom';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import Header from '../components/common/Header.tsx';
-import Footer from '../components/common/Footer.tsx';
-import MarketStatus from '../components/common/MarketStatus.tsx';
-import MarketTimings from '../components/common/MarketTimings.tsx';
-import CurrentDateDisplay from '../components/common/CurrentDateDisplay.tsx';
 
-const LandingPage = () => {
+import React, { useEffect, useCallback } from 'react';
+// FIX: The named import for HashRouter was failing. Using a namespace import as a workaround for a potential build tool or module resolution issue.
+import * as ReactRouterDom from 'react-router-dom';
+import { AppProvider, useAppContext } from './contexts/AppContext.tsx';
+import AppRoutes from './routes/AppRoutes.tsx';
+import { Role } from './types/index.ts';
+
+const InactivityManager: React.FC = () => {
     const { currentClient, logout } = useAppContext();
+
+    const handleLogout = useCallback(() => {
+        // This function will be called after 1 hour of inactivity.
+        // The client is logged out, and the AppRoutes will handle redirection.
+        logout();
+    }, [logout]);
+
+    useEffect(() => {
+        // If no client is logged in, there's nothing to do.
+        if (!currentClient) {
+            return;
+        }
+
+        const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hour in milliseconds
+        let inactivityTimer: number;
+
+        // This function resets the inactivity timer.
+        const resetTimer = () => {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = window.setTimeout(handleLogout, INACTIVITY_TIMEOUT);
+        };
+
+        // List of events that count as client activity.
+        const activityEvents: (keyof WindowEventMap)[] = [
+            'mousemove',
+            'mousedown',
+            'keypress',
+            'scroll',
+            'touchstart'
+        ];
+
+        // Add event listeners for all activity events.
+        activityEvents.forEach(event => {
+            window.addEventListener(event, resetTimer);
+        });
+
+        // Initialize the timer when the component mounts or the client logs in.
+        resetTimer();
+
+        // Cleanup function to remove listeners and clear the timer when the
+        // component unmounts or the client logs out.
+        return () => {
+            clearTimeout(inactivityTimer);
+            activityEvents.forEach(event => {
+                window.removeEventListener(event, resetTimer);
+            });
+        };
+    }, [currentClient, handleLogout]);
+
+    return null; // This component doesn't render anything to the DOM.
+};
+
+
+const App = () => {
+    useEffect(() => {
+        // This effect runs once after the initial render.
+        // It makes the root element visible, preventing the flash of unstyled content (FOUC).
+        const rootEl = document.getElementById('root');
+        if (rootEl) {
+            // The initial opacity is set to 0 via a style tag in index.html
+            rootEl.style.opacity = '1';
+        }
+    }, []);
     
     return (
-        <div className="min-h-screen bg-brand-bg flex flex-col text-brand-text pt-20">
-            <Header client={currentClient} onLogout={logout} />
-            <main className="flex-grow flex flex-col items-center justify-center p-4">
-                <div className="text-center max-w-7xl w-full">
-                    <h1 className="text-5xl md:text-6xl font-extrabold text-brand-primary my-6 animate-fade-in-down">
-                        Welcome to Daily Dubai Lottery
-                    </h1>
-                    <CurrentDateDisplay className="mb-4" />
-                    <p className="text-lg md:text-xl text-brand-text-secondary mb-4 max-w-2xl mx-auto">
-                        Your trusted platform for daily draws. Play responsibly and win big.
-                    </p>
-                    <p className="text-lg text-brand-text mb-8">
-                        For New Registration, please message us on WhatsApp: <a href="https://wa.me/447879144354" target="_blank" rel="noopener noreferrer" className="text-green-400 font-bold hover:underline">+44 7879 144354</a>
-                    </p>
-                    <div className="mb-8">
-                        <MarketTimings />
-                    </div>
-                    <div className="mb-8">
-                      <MarketStatus />
-                    </div>
-                    
-                    {!currentClient && (
-                        <div className="mt-12">
-                            <ReactRouterDom.Link to="/login" className="bg-brand-primary text-brand-bg font-bold py-3 px-8 rounded-lg text-lg hover:shadow-glow transition-all transform hover:scale-105">
-                                Login to Play
-                            </ReactRouterDom.Link>
-                        </div>
-                    )}
-                </div>
-            </main>
-            <Footer />
-        </div>
-    )
-}
+        <AppProvider>
+            <ReactRouterDom.HashRouter>
+                <InactivityManager />
+                <AppRoutes />
+            </ReactRouterDom.HashRouter>
+        </AppProvider>
+    );
+};
 
-export default LandingPage;
+export default App;
