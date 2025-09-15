@@ -1,9 +1,10 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import { parseMessageWithRules } from '../../services/RuleBasedParser.ts';
-import { ParsedBet, GameType, BettingCondition } from '../../types/index.ts';
-import { getGameTypeDisplayName } from '../../utils/helpers.ts';
+import { useAppContext } from '../../contexts/AppContext';
+import { parseMessageWithRules } from '../../services/RuleBasedParser';
+import { ParsedBet, GameType, BettingCondition } from '../../types';
+import { getGameTypeDisplayName } from '../../utils/helpers';
 
 const RuleBasedBulkBetting = () => {
     const { currentClient, draws, placeBulkBetsForCurrentClient } = useAppContext();
@@ -160,14 +161,14 @@ const RuleBasedBulkBetting = () => {
                             rows={6}
                             value={message}
                             onChange={e => setMessage(e.target.value)}
-                            placeholder="Paste the full message here, then click 'Parse Message' below."
+                            placeholder="Paste your full betting message here, then click 'Parse Message' below."
                             className="w-full bg-brand-bg border border-brand-secondary rounded-lg py-3 px-4 text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary font-mono"
                             disabled={isLoading}
                         />
                          <button 
                             onClick={handleParseMessage} 
                             disabled={isLoading || !message.trim() || !selectedDrawId}
-                            className="mt-2 w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-brand-secondary disabled:cursor-not-allowed"
+                            className="mt-2 w-full bg-brand-accent text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-400 disabled:bg-brand-secondary disabled:cursor-not-allowed transition-colors"
                         >
                             {isLoading ? 'Parsing...' : 'Parse Message'}
                         </button>
@@ -186,7 +187,7 @@ const RuleBasedBulkBetting = () => {
                                 <label className="text-xs font-bold text-brand-text-secondary">Stake</label>
                                 <input type="number" value={manualStake} min="1" step="1" onChange={e => setManualStake(e.target.value)} className="w-full bg-brand-surface border border-brand-secondary rounded-lg py-2 px-3 text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary" />
                             </div>
-                            <button type="submit" disabled={!manualNumber || manualNumber.length === 0} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-brand-secondary">Add Bet</button>
+                            <button type="submit" disabled={!manualNumber || manualNumber.length === 0} className="bg-brand-accent text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-400 disabled:bg-brand-secondary">Add Bet</button>
                         </form>
                     </div>
 
@@ -206,9 +207,9 @@ const RuleBasedBulkBetting = () => {
                                             <th scope="col" className="px-6 py-3 text-right">Stake</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-brand-bg">
+                                    <tbody className="bg-brand-surface">
                                         {parsedBets.map((bet, index) => (
-                                            <tr key={index} className="border-b border-brand-secondary">
+                                            <tr key={index} className="border-b border-brand-secondary hover:bg-brand-secondary/20">
                                                 <td className="px-6 py-2 font-mono text-brand-text">{bet.number}</td>
                                                 <td className="px-6 py-2">{getGameTypeDisplayName(bet.gameType)}</td>
                                                 <td className="px-6 py-2">{bet.condition || selectedCondition}</td>
