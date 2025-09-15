@@ -1,145 +1,136 @@
-const path = require('path');
-const db = require(path.join(__dirname, '..', 'database', 'db'));
+const db = require('../database/db');
 const bcrypt = require('bcryptjs');
+const { normalizeClientData } = require('../utils/dataHelpers');
 
 const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
 const getClientData = async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT id, clientId, username, role, wallet, area, contact, isActive, commissionRates, prizeRates FROM clients WHERE id = ?", [req.client.id]);
+        const [rows] = await db.execute("SELECT * FROM clients WHERE id = ?", [req.user.id]);
         const client = rows[0];
         if (!client) return res.status(404).json({ message: "Client not found" });
 
-        res.json({
-            ...client,
-            commissionRates: JSON.parse(client.commissionRates || '{}'),
-            prizeRates: JSON.parse(client.prizeRates || '{}'),
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+        res.json(normalizeClientData(client));
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
 const getClientBets = async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT * FROM bets WHERE clientId = ? ORDER BY createdAt DESC", [req.client.id]);
+        const [rows] = await db.execute("SELECT * FROM bets WHERE clientId = ? ORDER BY createdAt DESC", [req.user.id]);
         res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
 const getClientTransactions = async (req, res) => {
      try {
-        const [rows] = await db.query("SELECT * FROM transactions WHERE clientId = ? ORDER BY createdAt DESC", [req.client.id]);
+        const [rows] = await db.execute("SELECT * FROM transactions WHERE clientId = ? ORDER BY createdAt DESC", [req.user.id]);
         res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
 const placeBets = async (req, res) => {
     const { bets: betsToPlace } = req.body;
-    const clientId = req.client.id;
+    const clientId = req.user.id;
 
     if (!Array.isArray(betsToPlace) || betsToPlace.length === 0) {
         return res.status(400).json({ message: "Bets data is invalid or empty." });
     }
-    
-    let connection;
+
+    const connection = await db.getConnection();
     try {
-        connection = await db.getConnection();
         await connection.beginTransaction();
 
-        const [rows] = await connection.query("SELECT wallet FROM clients WHERE id = ? FOR UPDATE", [clientId]);
-        const client = rows[0];
-
+        const [clientRows] = await connection.execute("SELECT wallet FROM clients WHERE id = ? FOR UPDATE", [clientId]);
+        const client = clientRows[0];
         if (!client) {
             await connection.rollback();
             return res.status(404).json({ message: "Client not found." });
         }
 
         const totalStake = betsToPlace.reduce((sum, bet) => sum + bet.stake, 0);
-        if (parseFloat(client.wallet) < totalStake) {
+        if (client.wallet < totalStake) {
             await connection.rollback();
-            return res.status(400).json({ message: `Insufficient funds. Wallet: ${parseFloat(client.wallet).toFixed(2)}, Required: ${totalStake.toFixed(2)}` });
+            return res.status(400).json({ message: `Insufficient funds. Wallet: ${client.wallet.toFixed(2)}, Required: ${totalStake.toFixed(2)}` });
         }
 
-        const newBalance = parseFloat(client.wallet) - totalStake;
+        const newBalance = client.wallet - totalStake;
+        await connection.execute("UPDATE clients SET wallet = ? WHERE id = ?", [newBalance, clientId]);
+        
         const newTransaction = {
             id: `txn-${Date.now()}`, clientId, type: 'DEBIT', amount: totalStake,
             description: `Booking: ${betsToPlace.length} bet(s)`,
             balanceAfter: newBalance, createdAt: new Date()
         };
-
-        await connection.query("UPDATE clients SET wallet = ? WHERE id = ?", [newBalance, clientId]);
-        await connection.query("INSERT INTO transactions SET ?", newTransaction);
+        await connection.execute("INSERT INTO transactions (id, clientId, type, amount, description, balanceAfter, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", Object.values(newTransaction));
         
-        for (const bet of betsToPlace) {
-             const newBet = {
-                id: `bet-${generateUniqueId()}`, clientId, drawId: bet.drawId, 
-                gameType: bet.gameType, number: bet.number, stake: bet.stake, 
-                createdAt: new Date(), condition: bet.condition
-            };
-            await connection.query("INSERT INTO bets SET ?", newBet);
+        if (betsToPlace.length > 0) {
+            const betInsertSql = "INSERT INTO bets (id, clientId, drawId, gameType, number, stake, createdAt, condition, positions) VALUES ?";
+            const betValues = betsToPlace.map(bet => [
+                `bet-${generateUniqueId()}`, clientId, bet.drawId, bet.gameType, bet.number, bet.stake, new Date(), bet.condition, JSON.stringify(bet.positions || null)
+            ]);
+            await connection.query(betInsertSql, [betValues]);
         }
-
+        
         await connection.commit();
         res.status(201).json({ successCount: betsToPlace.length, message: `${betsToPlace.length} bets placed successfully.` });
 
-    } catch (err) {
-        if (connection) await connection.rollback();
-        console.error(err);
+    } catch (error) {
+        await connection.rollback();
+        console.error("Place bets error:", error);
         res.status(500).json({ message: "Transaction failed." });
     } finally {
-        if (connection) connection.release();
+        connection.release();
     }
 };
 
 const updateClientCredentials = async (req, res) => {
     const { currentPassword, newUsername, newPassword } = req.body;
-    const clientId = req.client.id;
-
+    const clientId = req.user.id;
+    
     try {
-        const [rows] = await db.query("SELECT * FROM clients WHERE id = ?", [clientId]);
+        const [rows] = await db.execute("SELECT * FROM clients WHERE id = ?", [clientId]);
         const client = rows[0];
         if (!client) return res.status(404).json({ message: "Client not found." });
 
         const isMatch = await bcrypt.compare(currentPassword, client.password);
         if (!isMatch) return res.status(401).json({ message: "Incorrect current password." });
 
-        const updates = [];
+        let sql = 'UPDATE clients SET ';
         const values = [];
 
         if (newUsername) {
-            updates.push("username = ?");
+            sql += 'username = ?';
             values.push(newUsername);
         }
+
         if (newPassword) {
+            if(values.length > 0) sql += ', ';
             const hash = await bcrypt.hash(newPassword, 10);
-            updates.push("password = ?");
+            sql += 'password = ?';
             values.push(hash);
         }
-        
-        if (updates.length === 0) return res.status(400).json({ message: "No new credentials provided." });
-        
-        const sql = `UPDATE clients SET ${updates.join(', ')} WHERE id = ?`;
-        await db.query(sql, [...values, clientId]);
 
-        // Re-fetch and send updated data
-        const [updatedRows] = await db.query("SELECT id, clientId, username, role, wallet, area, contact, isActive, commissionRates, prizeRates FROM clients WHERE id = ?", [clientId]);
-        res.json({
-            ...updatedRows[0],
-            commissionRates: JSON.parse(updatedRows[0].commissionRates || '{}'),
-            prizeRates: JSON.parse(updatedRows[0].prizeRates || '{}'),
-        });
+        if (values.length === 0) {
+            return res.status(400).json({ message: "No new credentials provided." });
+        }
+        
+        sql += ' WHERE id = ?';
+        values.push(clientId);
 
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: err.message });
+        await db.execute(sql, values);
+        
+        const [updatedRows] = await db.execute("SELECT * FROM clients WHERE id = ?", [clientId]);
+        res.json(normalizeClientData(updatedRows[0]));
+
+    } catch(error) {
+        console.error("Update credentials error:", error);
+        res.status(500).json({ message: "Server error while updating credentials." });
     }
 };
 
