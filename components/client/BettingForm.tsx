@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { GameType } from '../../types/index.ts';
+import { GameType } from '../../types';
 
 export const BettingForm: React.FC<{ 
     gameType: GameType; 
