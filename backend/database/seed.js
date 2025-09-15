@@ -52,7 +52,7 @@ const createTablesSQL = [
         number VARCHAR(255) NOT NULL,
         stake DECIMAL(15, 2) NOT NULL,
         createdAt DATETIME NOT NULL,
-        condition VARCHAR(50) NOT NULL,
+        bettingCondition VARCHAR(50) NOT NULL,
         positions JSON,
         FOREIGN KEY (clientId) REFERENCES clients(id) ON DELETE CASCADE,
         FOREIGN KEY (drawId) REFERENCES draws(id) ON DELETE CASCADE
