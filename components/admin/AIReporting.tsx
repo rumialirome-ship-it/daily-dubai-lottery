@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import { getSmartAnalysis } from '../../services/GeminiService.tsx';
-import { DrawStatus, GameType, Bet, SmartAnalysisReport } from '../../types/index.ts';
-import { getGameTypeDisplayName } from '../../utils/helpers.ts';
-import StatsCard from '../common/StatsCard.tsx';
+import { useAppContext } from '../../contexts/AppContext';
+import { getSmartAnalysis } from '../../services/GeminiService';
+import { DrawStatus, GameType, Bet, SmartAnalysisReport } from '../../types';
+import { getGameTypeDisplayName } from '../../utils/helpers';
+import StatsCard from '../common/StatsCard';
 
 type BetBreakdown = Map<string, { totalStake: number, count: number }>;
 
