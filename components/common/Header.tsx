@@ -1,5 +1,6 @@
 import React from 'react';
-import { Link, NavLink } from 'react-router-dom';
+// FIX: The named imports for Link and NavLink were failing. Using a namespace import as a workaround for a potential build tool or module resolution issue.
+import * as ReactRouterDom from 'react-router-dom';
 import { Client, Role } from '../../types/index.ts';
 
 const Logo = () => (
@@ -15,10 +16,10 @@ const Logo = () => (
 
 const Header: React.FC<{ onLogout: () => void; client: Client | null; }> = ({ onLogout, client }) => (
     <header className="fixed top-0 left-0 right-0 z-50 w-full bg-brand-surface/80 backdrop-blur-lg p-4 flex justify-between items-center shadow-md border-b border-brand-secondary h-16">
-        <Link to={client ? "/dashboard" : "/"} className="flex items-center gap-3 text-xl font-bold text-brand-primary">
+        <ReactRouterDom.Link to={client ? "/dashboard" : "/"} className="flex items-center gap-3 text-xl font-bold text-brand-primary">
             <Logo />
             <span className="hidden sm:inline">Daily Dubai Lottery</span>
-        </Link>
+        </ReactRouterDom.Link>
         <div className="flex items-center space-x-4">
             {client ? (
                 <>
@@ -30,9 +31,9 @@ const Header: React.FC<{ onLogout: () => void; client: Client | null; }> = ({ on
                     <button onClick={onLogout} className="bg-danger/80 hover:bg-danger text-white font-bold py-2 px-4 rounded-lg transition-colors">Logout</button>
                 </>
             ) : (
-                <NavLink to="/login" className="bg-brand-primary hover:shadow-glow text-brand-bg font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-all duration-300">
+                <ReactRouterDom.NavLink to="/login" className="bg-brand-primary hover:shadow-glow text-brand-bg font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-all duration-300">
                     Login / Register
-                </NavLink>
+                </ReactRouterDom.NavLink>
             )}
         </div>
     </header>
