@@ -1,4 +1,4 @@
-import React, { useState, useContext, createContext, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useContext, createContext, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Client, Draw, Bet, Role, AppContextType, DrawStatus, BettingCondition, GameType, MarketOverride, Transaction, TransactionType, ClientImportData } from '../types';
 import { normalizeClientData } from '../utils/helpers';
 import { defaultPrizeRates, defaultCommissionRates } from '../data/mockData';
@@ -42,6 +42,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [currentClient, setCurrentClient] = useState<Client | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const pollingTimeoutRef = useRef<number | null>(null);
+
 
     const fetchDataForUser = useCallback(async () => {
         if (!localStorage.getItem('ddl_token')) {
@@ -84,25 +86,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Initial load and draw polling
     useEffect(() => {
-        const fetchInitialData = async () => {
-            setIsLoading(true);
+        const pollData = async () => {
             try {
+                // Clear any previous error on a new attempt
+                if(error) setError(null);
+
                 const drawsData = await apiFetch('/draws');
                 setDraws(drawsData.map((d: Draw) => ({ ...d, drawTime: new Date(d.drawTime) })));
                 await fetchDataForUser();
-                setError(null); // Clear error on successful fetch
-            } catch (error) {
-                console.error("Failed to fetch initial data", error);
+
+                // Schedule the next poll only on success
+                pollingTimeoutRef.current = window.setTimeout(pollData, 15000);
+            } catch (err) {
+                console.error("Data polling failed:", err);
                 setError("Could not connect to the server. Please ensure the backend server is running and accessible.");
+                // Stop polling on error
             } finally {
-                setIsLoading(false);
+                // This ensures the initial "Loading..." message is removed
+                if (isLoading) {
+                    setIsLoading(false);
+                }
             }
         };
 
-        fetchInitialData();
-        const intervalId = setInterval(fetchInitialData, 15000); // Poll every 15 seconds
-        return () => clearInterval(intervalId);
-    }, [fetchDataForUser]);
+        pollData(); // Start the polling loop
+
+        // Cleanup function to clear the timeout when the component unmounts
+        return () => {
+            if (pollingTimeoutRef.current) {
+                clearTimeout(pollingTimeoutRef.current);
+            }
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetchDataForUser]); // We only want this effect to run once on mount
 
     const login = useCallback(async (loginIdentifier: string, password: string, role: Role): Promise<{ success: boolean; message?: string }> => {
         try {
@@ -309,7 +325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                <div className="bg-brand-surface p-8 rounded-lg border border-danger max-w-lg text-center shadow-lg animate-fade-in-down">
                    <h1 className="text-2xl font-bold text-danger mb-4">Connection Error</h1>
                    <p className="mb-4">{error}</p>
-                   <p className="text-sm text-brand-text-secondary">The application will attempt to reconnect automatically. If you are the administrator, please start the backend server.</p>
+                   <p className="text-sm text-brand-text-secondary">Please try refreshing the page after ensuring the backend server is running.</p>
                </div>
            </div>
        );
