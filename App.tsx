@@ -1,10 +1,11 @@
 
+
 import React, { useEffect, useCallback } from 'react';
 // FIX: The named import for HashRouter was failing. Using a namespace import as a workaround for a potential build tool or module resolution issue.
 import * as ReactRouterDom from 'react-router-dom';
-import { AppProvider, useAppContext } from './contexts/AppContext.tsx';
-import AppRoutes from './routes/AppRoutes.tsx';
-import { Role } from './types/index.ts';
+import { AppProvider, useAppContext } from './contexts/AppContext';
+import AppRoutes from './routes/AppRoutes';
+import { Role } from './types';
 
 const InactivityManager: React.FC = () => {
     const { currentClient, logout } = useAppContext();
