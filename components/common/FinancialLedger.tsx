@@ -1,7 +1,8 @@
 
+
 import React, { useMemo } from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import { TransactionType } from '../../types/index.ts';
+import { useAppContext } from '../../contexts/AppContext';
+import { TransactionType } from '../../types';
 
 const FinancialLedger: React.FC<{ clientId: string }> = ({ clientId }) => {
     const { transactions, clients } = useAppContext();
