@@ -1,10 +1,9 @@
-const path = require('path');
-const db = require(path.join(__dirname, '..', 'database', 'db'));
-const { getDynamicDrawStatus } = require(path.join(__dirname, '..', 'utils', 'drawHelpers'));
+const db = require('../database/db');
+const { getDynamicDrawStatus } = require('../utils/drawHelpers');
 
 const getDraws = async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT * FROM draws");
+        const [rows] = await db.execute("SELECT * FROM draws");
         
         const marketOverride = 'AUTO'; // This could be fetched from a config table in the future
         const currentTime = new Date();
@@ -13,7 +12,8 @@ const getDraws = async (req, res) => {
             const drawData = {
                 ...draw,
                 drawTime: new Date(draw.drawTime),
-                winningNumbers: JSON.parse(draw.winningNumbers || '[]')
+                // FIX: Robustly parse winningNumbers to handle NULL or empty strings from the DB
+                winningNumbers: draw.winningNumbers ? JSON.parse(draw.winningNumbers) : []
             };
             return {
                 ...drawData,
@@ -22,8 +22,9 @@ const getDraws = async (req, res) => {
         });
         
         res.json(drawsWithStatus);
-    } catch (err) {
-        console.error(err);
+    } catch (error) {
+        // Log the actual error on the server for better debugging
+        console.error("Error in getDraws controller:", error);
         res.status(500).json({ message: "Failed to retrieve draws." });
     }
 };
