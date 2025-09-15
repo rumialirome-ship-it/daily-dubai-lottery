@@ -1,7 +1,7 @@
 import React from 'react';
-import { Bet, Draw, DrawStatus, GameType } from '../../types/index.ts';
-import { isBetWinner } from '../../utils/helpers.ts';
-import { useAppContext } from '../../contexts/AppContext.tsx';
+import { Bet, Draw, DrawStatus, GameType } from '../../types';
+import { isBetWinner } from '../../utils/helpers';
+import { useAppContext } from '../../contexts/AppContext';
 
 const BetResult: React.FC<{ bet: Bet; draw?: Draw }> = ({ bet, draw }) => {
     const { currentClient } = useAppContext();
