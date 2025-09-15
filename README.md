@@ -47,7 +47,7 @@ npm install
 
 # Run the build script, providing your API key
 # You can get your key from Google AI Studio
-API_KEY=AIzaSyD48pI0ogdWfG86md76C4bmBlvp4XTp1Tk npm run build
+API_KEY=AIzaSyCF0j0LFCwPdpz30sdfiyEHG44qlLIGW1Q npm run build
 ```
 
 This command will create a `dist` directory in your project root, containing the optimized frontend application with the API key embedded.
@@ -116,7 +116,7 @@ Paste the following content into the file.
 ```
 PORT=5000
 JWT_SECRET=your_super_strong_and_secret_jwt_key_here
-API_KEY=AIzaSyD48pI0ogdWfG86md76C4bmBlvp4XTp1Tk
+API_KEY=AIzaSyCF0j0LFCwPdpz30sdfiyEHG44qlLIGW1Q
 DB_HOST=localhost
 DB_USER=ddl_user
 DB_PASSWORD=your_strong_password
