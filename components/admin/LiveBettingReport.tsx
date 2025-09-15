@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { useAppContext } from '../../contexts/AppContext.tsx';
-import { Draw, Bet, BettingCondition, GameType } from '../../types/index.ts';
-import { getGameTypeDisplayName } from '../../utils/helpers.ts';
+import { useAppContext } from '../../contexts/AppContext';
+import { Draw, Bet, BettingCondition, GameType } from '../../types';
+import { getGameTypeDisplayName } from '../../utils/helpers';
 
 const LiveBettingReport: React.FC<{ draw: Draw }> = ({ draw }) => {
     const { getLiveDrawAnalysis } = useAppContext();
