@@ -1,7 +1,7 @@
 import React, { useState, useContext, createContext, useMemo, useCallback, useEffect } from 'react';
-import { Client, Draw, Bet, Role, AppContextType, DrawStatus, BettingCondition, GameType, MarketOverride, Transaction, TransactionType, ClientImportData } from '../types/index.ts';
-import { normalizeClientData } from '../utils/helpers.ts';
-import { defaultPrizeRates, defaultCommissionRates } from '../data/mockData.ts';
+import { Client, Draw, Bet, Role, AppContextType, DrawStatus, BettingCondition, GameType, MarketOverride, Transaction, TransactionType, ClientImportData } from '../types';
+import { normalizeClientData } from '../utils/helpers';
+import { defaultPrizeRates, defaultCommissionRates } from '../data/mockData';
 
 const AppContext = createContext<AppContextType | null>(null);
 
@@ -42,17 +42,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [currentClient, setCurrentClient] = useState<Client | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    
-    const logout = useCallback(async () => {
-        localStorage.removeItem('ddl_token');
-        setCurrentClient(null);
-        setClients([]);
-        setBets([]);
-        setTransactions([]);
-    }, []);
 
-    const fetchDataForClient = useCallback(async () => {
+    const fetchDataForUser = useCallback(async () => {
         if (!localStorage.getItem('ddl_token')) {
+            setIsLoading(false);
             return;
         }
         try {
@@ -84,58 +77,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                  await logout(); // Token is invalid
             }
         } catch (error) {
-            console.error("Failed to fetch client data, logging out.", error);
+            console.error("Failed to fetch user data, logging out.", error);
             await logout();
         }
-    }, [logout]);
+    }, []);
 
     // Initial load and draw polling
     useEffect(() => {
-        let isMounted = true;
-        const POLLING_INTERVAL = 15000;
-        let timeoutId: number;
-
-        const poll = async (isInitialLoad: boolean) => {
-            // Only show the full-page loader on the very first load.
-            // Subsequent polls will happen in the background to avoid UI flashing.
-            if (isInitialLoad) {
-                setIsLoading(true);
-            }
-            
+        const fetchInitialData = async () => {
+            setIsLoading(true);
             try {
                 const drawsData = await apiFetch('/draws');
-                // Stop further execution if component has unmounted during an async operation
-                if (!isMounted) return;
-
                 setDraws(drawsData.map((d: Draw) => ({ ...d, drawTime: new Date(d.drawTime) })));
-                await fetchDataForClient();
-
-                if (!isMounted) return;
-                setError(null); // Clear any previous error on a successful fetch
+                await fetchDataForUser();
+                setError(null); // Clear error on successful fetch
             } catch (error) {
-                if (!isMounted) return;
-                console.error("Failed to fetch data", error);
+                console.error("Failed to fetch initial data", error);
                 setError("Could not connect to the server. Please ensure the backend server is running and accessible.");
             } finally {
-                if (isInitialLoad && isMounted) {
-                    setIsLoading(false);
-                }
-                // Schedule the next poll only if the component is still mounted.
-                // This creates a robust loop that waits for the previous fetch to complete.
-                if (isMounted) {
-                    timeoutId = window.setTimeout(() => poll(false), POLLING_INTERVAL);
-                }
+                setIsLoading(false);
             }
         };
-        
-        poll(true); // Start the first fetch, flagging it as the initial load.
 
-        // Cleanup function to stop polling when the component unmounts.
-        return () => {
-            isMounted = false;
-            clearTimeout(timeoutId);
-        };
-    }, [fetchDataForClient]);
+        fetchInitialData();
+        const intervalId = setInterval(fetchInitialData, 15000); // Poll every 15 seconds
+        return () => clearInterval(intervalId);
+    }, [fetchDataForUser]);
 
     const login = useCallback(async (loginIdentifier: string, password: string, role: Role): Promise<{ success: boolean; message?: string }> => {
         try {
@@ -144,7 +111,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 body: JSON.stringify({ loginIdentifier, password, role }),
             });
             localStorage.setItem('ddl_token', data.token);
-            await fetchDataForClient(); // Fetch all data for the newly logged-in user
+            await fetchDataForUser(); // Fetch all data for the newly logged-in user
             // Re-fetch draws to ensure status is fresh on login
              const drawsData = await apiFetch('/draws');
              setDraws(drawsData.map((d: Draw) => ({ ...d, drawTime: new Date(d.drawTime) })));
@@ -152,8 +119,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (error: any) {
             return { success: false, message: error.message };
         }
-    }, [fetchDataForClient]);
+    }, [fetchDataForUser]);
 
+    const logout = useCallback(async () => {
+        localStorage.removeItem('ddl_token');
+        setCurrentClient(null);
+        setClients([]);
+        setBets([]);
+        setTransactions([]);
+    }, []);
     
     const placeBulkBetsForCurrentClient = useCallback(async (betsToPlace: Omit<Bet, 'id' | 'clientId'>[]): Promise<{ successCount: number; message: string; }> => {
         if (!currentClient || currentClient.role !== Role.Client) {
@@ -164,13 +138,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 method: 'POST',
                 body: JSON.stringify({ bets: betsToPlace }),
             });
-            // Refresh client data to get new wallet balance and transactions
-            await fetchDataForClient();
+            // Refresh user data to get new wallet balance and transactions
+            await fetchDataForUser();
             return { successCount: result.successCount, message: result.message };
         } catch (error: any) {
              return { successCount: 0, message: error.message };
         }
-    }, [currentClient, fetchDataForClient]);
+    }, [currentClient, fetchDataForUser]);
     
     const declareWinner = useCallback(async (drawId: string, winningNumbers: string[]): Promise<void> => {
          try {
@@ -181,12 +155,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // Refresh all data
             const drawsData = await apiFetch('/draws');
             setDraws(drawsData.map((d: Draw) => ({ ...d, drawTime: new Date(d.drawTime) })));
-            await fetchDataForClient();
+            await fetchDataForUser();
             alert(`Winners for draw ${drawId} declared successfully!`);
         } catch (error: any) {
             alert(`Failed to declare winner: ${error.message}`);
         }
-    }, [fetchDataForClient]);
+    }, [fetchDataForUser]);
     
     const registerClient = useCallback(async (clientData: Omit<Client, 'id' | 'role' | 'isActive'>): Promise<{ success: boolean, message: string }> => {
         try {
@@ -212,12 +186,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (currentClient?.id === clientId) {
                 setCurrentClient(normalizeClientData(updatedClient));
             }
-            await fetchDataForClient(); // to get latest transactions
+            await fetchDataForUser(); // to get latest transactions
             return { success: true, message: 'Wallet updated successfully.' };
         } catch (error: any) {
             return { success: false, message: error.message };
         }
-    }, [currentClient, fetchDataForClient]);
+    }, [currentClient, fetchDataForUser]);
     
     const updateClientDetailsByAdmin = useCallback(async (clientId: string, details: { clientId?: string; username?: string; contact?: string; area?: string; }): Promise<{ success: boolean, message: string }> => {
          try {
@@ -263,12 +237,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 method: 'POST',
                 body: JSON.stringify({ bets: betsToPlace, clientId }),
             });
-            await fetchDataForClient(); // Refresh data for admin
+            await fetchDataForUser(); // Refresh data for admin
             return { successCount: result.successCount, message: result.message };
         } catch (error: any) {
             return { successCount: 0, message: error.message };
         }
-    }, [fetchDataForClient]);
+    }, [fetchDataForUser]);
     
     const getDrawStats = useCallback(async (drawId: string): Promise<any> => {
         return apiFetch(`/admin/reports/draw/${drawId}`);
